@@ -1,0 +1,553 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand — dark theme */
+  --teal: #14B8B8;
+  --teal-dark: #0E9494;
+  --teal-accent: #2DD4D4;
+  --teal-light: rgba(20, 184, 184, 0.14);
+  --bg: #0B1117;
+  --bg-2: #0F1620;
+  --card: #141C26;
+  --card-2: #1A2330;
+  --text: #E6EAF0;
+  --text-2: #94A3B8;
+  --text-muted: #64748B;
+  --border: #1E2A38;
+  --border-2: #2A3848;
+  --success: #34D399;
+  --warning: #FBBF24;
+  --danger: #F87171;
+
+  /* Shadcn HSL vars tuned to dark teal */
+  --background: 212 27% 7%;
+  --foreground: 220 20% 92%;
+  --card: 215 28% 12%;
+  --card-foreground: 220 20% 92%;
+  --popover: 215 28% 12%;
+  --popover-foreground: 220 20% 92%;
+  --primary: 180 80% 40%;
+  --primary-foreground: 212 27% 7%;
+  --secondary: 215 25% 16%;
+  --secondary-foreground: 180 70% 80%;
+  --muted: 215 25% 16%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 215 25% 16%;
+  --accent-foreground: 220 20% 92%;
+  --destructive: 0 76% 65%;
+  --destructive-foreground: 220 20% 95%;
+  --border: 215 24% 18%;
+  --input: 215 24% 18%;
+  --ring: 180 80% 45%;
+  --radius: 0.625rem;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+/* Form labels */
+.df-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* Card */
+.df-card {
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+}
+
+/* Inputs */
+.df-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--card-2);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  outline: none;
+}
+.df-input::placeholder { color: var(--text-muted); }
+.df-input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(20,184,184,0.20);
+}
+.df-input[type="date"] { padding: 8px 12px; color-scheme: dark; }
+
+textarea.df-input { resize: vertical; min-height: 76px; font-family: inherit; }
+
+/* Primary button */
+.df-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  background: var(--teal);
+  color: #06161A;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease;
+  min-height: 40px;
+  line-height: 1.2;
+  text-align: center;
+}
+.df-btn:hover { background: var(--teal-accent); }
+.df-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.df-btn-ghost {
+  background: transparent;
+  color: var(--teal-accent);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+.df-btn-ghost:hover { background: var(--teal-light); border-color: var(--teal); }
+
+.df-btn-danger { background: var(--danger); color: #1a0808; }
+.df-btn-danger:hover { background: #fca5a5; }
+
+/* Chip */
+.df-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  user-select: none;
+  min-height: 34px;
+}
+.df-chip:hover { border-color: var(--teal); color: var(--teal-accent); }
+.df-chip.active {
+  background: var(--teal);
+  color: #06161A;
+  border-color: var(--teal);
+}
+
+/* Sidebar — keep teal as accent surface */
+.df-sidebar {
+  background: linear-gradient(180deg, #0A6E6E 0%, #075555 100%);
+  color: #fff;
+  width: 240px;
+  min-height: 100vh;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 30;
+  display: flex; flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  transition: transform 180ms ease;
+}
+.df-sidebar a {
+  color: rgba(255,255,255,0.78);
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 18px;
+  font-size: 14px;
+  border-left: 3px solid transparent;
+  transition: background-color 150ms ease, color 150ms ease;
+  text-decoration: none;
+}
+.df-sidebar a:hover { background: rgba(255,255,255,0.10); color: #fff; }
+.df-sidebar a.active {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border-left-color: #fff;
+}
+
+/* Header */
+.df-header {
+  min-height: 56px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  position: sticky; top: 0;
+  z-index: 20;
+  gap: 12px;
+}
+
+/* Tabs */
+.df-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.df-tab {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-2);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: color 150ms ease, border-color 150ms ease;
+  background: transparent;
+}
+.df-tab:hover { color: var(--teal-accent); }
+.df-tab.active { color: var(--teal-accent); border-bottom-color: var(--teal); font-weight: 600; }
+
+/* Stat card */
+.df-stat:hover { transform: translateY(-1px); transition: transform 150ms ease; }
+
+/* Action card */
+.df-action {
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 22px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-align: left;
+}
+.df-action:hover { border-color: var(--teal); box-shadow: 0 6px 22px rgba(20,184,184,0.18); transform: translateY(-2px); }
+.df-action.primary {
+  border-color: var(--teal);
+  background: linear-gradient(180deg, var(--card) 0%, rgba(20,184,184,0.12) 100%);
+}
+
+/* Badges */
+.df-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px; font-size: 11px;
+  font-weight: 500; letter-spacing: 0.02em;
+}
+.df-badge-teal  { background: var(--teal-light); color: var(--teal-accent); border: 1px solid rgba(20,184,184,0.30); }
+.df-badge-grey  { background: rgba(148,163,184,0.12); color: var(--text-2); border: 1px solid var(--border); }
+.df-badge-red   { background: rgba(248,113,113,0.14); color: var(--danger); border: 1px solid rgba(248,113,113,0.30); }
+.df-badge-green { background: rgba(52,211,153,0.14); color: var(--success); border: 1px solid rgba(52,211,153,0.30); }
+.df-badge-amber { background: rgba(251,191,36,0.14); color: var(--warning); border: 1px solid rgba(251,191,36,0.30); }
+
+/* Confirmation dialogs */
+.df-confirm-dialog {
+  background: var(--teal);
+  color: #06161A;
+  border-color: var(--teal-accent);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+.df-confirm-dialog h3,
+.df-confirm-dialog p {
+  color: #06161A !important;
+}
+
+.df-confirm-dialog .df-btn-ghost {
+  background: rgba(6,22,26,0.08);
+  color: #06161A;
+  border-color: rgba(6,22,26,0.26);
+}
+
+.df-confirm-dialog .df-btn-ghost:hover {
+  background: rgba(6,22,26,0.16);
+}
+
+/* Toasts */
+[data-sonner-toast],
+[data-sonner-toast][data-styled="true"],
+[data-sonner-toast][data-type] {
+  background: var(--teal) !important;
+  color: #06161A !important;
+  border: 1px solid var(--teal-accent) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.38), 0 0 0 1px rgba(255,255,255,0.08) !important;
+}
+
+[data-sonner-toast] [data-title],
+[data-sonner-toast] [data-description],
+[data-sonner-toast] [data-icon],
+[data-sonner-toast] [data-close-button] {
+  color: #06161A !important;
+}
+
+/* Headings */
+h1, h2, h3, h4 { font-weight: 600; color: var(--text); }
+h1 { font-size: 28px; letter-spacing: -0.01em; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+
+.df-main {
+  min-width: 0;
+  width: 100%;
+}
+
+.df-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.df-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.df-table-scroll table {
+  min-width: 680px;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th, td {
+  vertical-align: middle;
+}
+
+/* Divider */
+.df-divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #2a3848; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4858; }
+
+/* Odontogram */
+.odont-card {
+  padding: 14px;
+  background: #F7F7F4;
+  border-color: rgba(148, 163, 184, 0.28);
+  overflow: hidden;
+}
+
+.odont-scroll {
+  overflow-x: auto;
+  padding: 8px 0 10px;
+}
+
+.odont-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(16, 72px);
+  justify-content: center;
+  min-width: 1152px;
+  gap: 0;
+}
+
+.odont-tooth-cell {
+  position: relative;
+  width: 72px;
+  height: 166px;
+}
+
+.odont-tooth-svg {
+  display: block;
+  overflow: visible;
+}
+
+.odont-label {
+  fill: #2563EB;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.odont-arch-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  color: #2563EB;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.odont-arch-labels div:first-child { text-align: right; padding-right: 16px; }
+.odont-arch-labels div:last-child { text-align: left; padding-left: 16px; }
+
+.odont-bite-line {
+  width: 100%;
+  min-width: 1152px;
+  height: 18px;
+  position: relative;
+}
+
+.odont-bite-line::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 50%;
+  border-top: 1px dashed rgba(166, 163, 155, 0.45);
+}
+
+.odont-midline {
+  position: absolute;
+  top: 8px;
+  right: -1px;
+  width: 1px;
+  height: 138px;
+  background: rgba(166, 163, 155, 0.55);
+}
+
+.tooth-outline,
+.tooth-root {
+  stroke: #A6A39B;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.tooth-root {
+  pointer-events: none;
+}
+
+.tooth-click,
+.tooth-surface {
+  cursor: pointer;
+  transition: fill 150ms ease, stroke 150ms ease, filter 150ms ease;
+}
+
+.tooth-surface {
+  stroke: #A6A39B;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.tooth-click:hover,
+.tooth-surface:hover {
+  stroke: #2563EB;
+  filter: drop-shadow(0 1px 2px rgba(37, 99, 235, 0.22));
+}
+
+/* Animations */
+@keyframes df-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.df-anim-in { animation: df-fade-in 200ms ease-out both; }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .df-sidebar { transform: translateX(-100%); }
+  .df-sidebar.open { transform: translateX(0); }
+  .df-main { margin-left: 0 !important; }
+}
+
+@media (max-width: 640px) {
+  .df-page {
+    padding: 16px 12px 24px;
+  }
+
+  .df-header {
+    padding: 8px 12px;
+  }
+
+  .df-header .df-label {
+    display: none;
+  }
+
+  .df-card {
+    border-radius: 10px;
+  }
+
+  .df-card.p-6,
+  .df-card.p-5 {
+    padding: 16px;
+  }
+
+  h1 {
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+
+  .df-btn {
+    padding: 9px 12px;
+  }
+
+  .df-chip {
+    padding: 7px 10px;
+  }
+
+  .df-tab {
+    padding: 12px 13px;
+  }
+}
+
+@media (max-width: 420px) {
+  .df-page {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .df-header {
+    align-items: flex-start;
+  }
+
+  .df-header-user {
+    gap: 6px;
+  }
+
+  .df-header-user .df-badge {
+    display: none;
+  }
+
+  .df-logout span {
+    display: none;
+  }
+
+  .df-logout {
+    width: 40px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* Recharts dark tweaks */
+.recharts-cartesian-axis-tick-value { fill: var(--text-2) !important; }
+.recharts-default-tooltip {
+  background: var(--card-2) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 8px !important;
+}
+.recharts-legend-item-text { color: var(--text-2) !important; }
