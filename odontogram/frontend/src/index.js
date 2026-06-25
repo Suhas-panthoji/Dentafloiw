@@ -4,16 +4,16 @@ import "@/index.css";
 import App from "@/App";
 
 try {
-  const theme = localStorage.getItem("dentaflow-theme") || "dark";
+  const theme = localStorage.getItem("odontogram-theme") || "dark";
   document.documentElement.dataset.theme = theme;
   document.documentElement.classList.toggle("dark", theme === "dark");
 } catch {
-  // Fall back to the CSS default theme.
+  // Fall back to default dark theme
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 );

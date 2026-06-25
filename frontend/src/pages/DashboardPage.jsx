@@ -4,6 +4,7 @@ import { Users, Calendar, TrendingUp, AlertCircle, UserPlus, Wallet, Plus, Phone
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { inr, fmtDate } from "@/lib/format";
+import PatientViewModal from "@/components/PatientViewModal";
 
 function StatCard({ icon: Icon, label, value, hint, color = "teal", testid }) {
   const colors = {
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const { isDoctor, user } = useAuth();
   const nav = useNavigate();
   const [data, setData] = useState(null);
+  const [viewPatientId, setViewPatientId] = useState(null);
 
   useEffect(() => {
     api.get("/dashboard").then((r) => setData(r.data)).catch(() => setData({}));
@@ -96,7 +98,7 @@ export default function DashboardPage() {
                     <div className="font-medium text-sm">{p.first_name} {p.last_name}</div>
                     <div className="text-[12px] text-[var(--text-2)] flex items-center gap-1"><Phone size={12}/>{p.mobile}</div>
                   </div>
-                  <Link to={`/patients/${p.id}`} className="df-btn df-btn-ghost py-1 px-3 text-[13px]">View</Link>
+                  <button onClick={() => setViewPatientId(p.id)} className="df-btn df-btn-ghost py-1 px-3 text-[13px]">View</button>
                 </li>
               ))}
             </ul>
@@ -113,15 +115,23 @@ export default function DashboardPage() {
                 <li key={f.patient_id + f.followup_date} className="py-3 flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <div className="font-medium text-sm">{f.patient_name}</div>
-                    <div className="text-[12px] text-[var(--text-2)]">{f.mobile} · {fmtDate(f.followup_date)}</div>
+                    <div className="text-[12px] text-[var(--text-2)]">{f.mobile} - {fmtDate(f.followup_date)}</div>
+                    {f.scheduled_treatment && <div className="text-[12px] text-[var(--teal)] mt-1">{f.scheduled_treatment}</div>}
                   </div>
-                  <Link to={`/patients/${f.patient_id}`} className="df-btn df-btn-ghost py-1 px-3 text-[13px]">Open</Link>
+                  <Link to="/followups" className="df-btn df-btn-ghost py-1 px-3 text-[13px]">Open</Link>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </div>
+      {viewPatientId && (
+        <PatientViewModal
+          patientId={viewPatientId}
+          onClose={() => setViewPatientId(null)}
+          onEdit={(id) => { setViewPatientId(null); nav(`/patients/${id}`); }}
+        />
+      )}
     </div>
   );
 }

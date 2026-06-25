@@ -1,0 +1,1008 @@
+﻿diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 6e7017d..d10bfb5 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -4,7 +4,8 @@
+ @tailwind components;
+ @tailwind utilities;
+ 
+-:root {
++:root,
++:root[data-theme="dark"] {
+   /* Brand ΓÇö dark theme */
+   --teal: #14B8B8;
+   --teal-dark: #0E9494;
+@@ -24,34 +25,80 @@
+   --danger: #F87171;
+ 
+   /* Shadcn HSL vars tuned to dark teal */
+-  --background: 212 27% 7%;
+-  --foreground: 220 20% 92%;
+-  --card: 215 28% 12%;
+-  --card-foreground: 220 20% 92%;
+-  --popover: 215 28% 12%;
+-  --popover-foreground: 220 20% 92%;
+-  --primary: 180 80% 40%;
+-  --primary-foreground: 212 27% 7%;
+-  --secondary: 215 25% 16%;
+-  --secondary-foreground: 180 70% 80%;
+-  --muted: 215 25% 16%;
+-  --muted-foreground: 215 20% 65%;
+-  --accent: 215 25% 16%;
+-  --accent-foreground: 220 20% 92%;
+-  --destructive: 0 76% 65%;
+-  --destructive-foreground: 220 20% 95%;
+-  --border: 215 24% 18%;
+-  --input: 215 24% 18%;
+-  --ring: 180 80% 45%;
++  --shadow-soft: 0 1px 3px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.02);
++  --scrollbar-thumb: #2a3848;
++  --scrollbar-thumb-hover: #3a4858;
++  --sh-background: 212 27% 7%;
++  --sh-foreground: 220 20% 92%;
++  --sh-card: 215 28% 12%;
++  --sh-card-foreground: 220 20% 92%;
++  --sh-popover: 215 28% 12%;
++  --sh-popover-foreground: 220 20% 92%;
++  --sh-primary: 180 80% 40%;
++  --sh-primary-foreground: 212 27% 7%;
++  --sh-secondary: 215 25% 16%;
++  --sh-secondary-foreground: 180 70% 80%;
++  --sh-muted: 215 25% 16%;
++  --sh-muted-foreground: 215 20% 65%;
++  --sh-accent: 215 25% 16%;
++  --sh-accent-foreground: 220 20% 92%;
++  --sh-destructive: 0 76% 65%;
++  --sh-destructive-foreground: 220 20% 95%;
++  --sh-border: 215 24% 18%;
++  --sh-input: 215 24% 18%;
++  --sh-ring: 180 80% 45%;
+   --radius: 0.625rem;
+   color-scheme: dark;
+ }
+ 
++:root[data-theme="light"] {
++  --teal: #0D9488;
++  --teal-dark: #0F766E;
++  --teal-accent: #0F766E;
++  --teal-light: rgba(13, 148, 136, 0.12);
++  --bg: #F5F8FA;
++  --bg-2: #FFFFFF;
++  --card: #FFFFFF;
++  --card-2: #F8FAFC;
++  --text: #0F172A;
++  --text-2: #475569;
++  --text-muted: #94A3B8;
++  --border: #D9E2EC;
++  --border-2: #CBD5E1;
++  --success: #059669;
++  --warning: #B45309;
++  --danger: #DC2626;
++  --shadow-soft: 0 1px 2px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.02);
++  --scrollbar-thumb: #CBD5E1;
++  --scrollbar-thumb-hover: #94A3B8;
++
++  --sh-background: 210 40% 98%;
++  --sh-foreground: 222 47% 11%;
++  --sh-card: 0 0% 100%;
++  --sh-card-foreground: 222 47% 11%;
++  --sh-popover: 0 0% 100%;
++  --sh-popover-foreground: 222 47% 11%;
++  --sh-primary: 174 80% 32%;
++  --sh-primary-foreground: 0 0% 100%;
++  --sh-secondary: 210 40% 96%;
++  --sh-secondary-foreground: 222 47% 11%;
++  --sh-muted: 210 40% 96%;
++  --sh-muted-foreground: 215 16% 47%;
++  --sh-accent: 210 40% 96%;
++  --sh-accent-foreground: 222 47% 11%;
++  --sh-destructive: 0 84% 60%;
++  --sh-destructive-foreground: 0 0% 98%;
++  --sh-border: 214 32% 91%;
++  --sh-input: 214 32% 91%;
++  --sh-ring: 174 80% 32%;
++  color-scheme: light;
++}
++
+ *,
+ *::before,
+ *::after {
+   box-sizing: border-box;
+-  border-color: hsl(var(--border));
++  border-color: var(--border);
+ }
+ 
+ html, body, #root {
+@@ -90,7 +137,7 @@ button, input, select, textarea {
+ .df-card {
+   background: var(--card);
+   border-radius: 12px;
+-  box-shadow: 0 1px 3px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.02);
++  box-shadow: var(--shadow-soft);
+   border: 1px solid var(--border);
+ }
+ 
+@@ -112,7 +159,7 @@ button, input, select, textarea {
+   border-color: var(--teal);
+   box-shadow: 0 0 0 3px rgba(20,184,184,0.20);
+ }
+-.df-input[type="date"] { padding: 8px 12px; color-scheme: dark; }
++.df-input[type="date"] { padding: 8px 12px; color-scheme: inherit; }
+ 
+ textarea.df-input { resize: vertical; min-height: 76px; font-family: inherit; }
+ 
+@@ -144,6 +191,11 @@ textarea.df-input { resize: vertical; min-height: 76px; font-family: inherit; }
+ }
+ .df-btn-ghost:hover { background: var(--teal-light); border-color: var(--teal); }
+ 
++.df-theme-toggle {
++  min-width: 96px;
++  white-space: nowrap;
++}
++
+ .df-btn-danger { background: var(--danger); color: #1a0808; }
+ .df-btn-danger:hover { background: #fca5a5; }
+ 
+@@ -231,6 +283,13 @@ textarea.df-input { resize: vertical; min-height: 76px; font-family: inherit; }
+ }
+ .df-tab:hover { color: var(--teal-accent); }
+ .df-tab.active { color: var(--teal-accent); border-bottom-color: var(--teal); font-weight: 600; }
++.df-tab.locked {
++  color: var(--text-muted);
++  opacity: 0.65;
++}
++.df-tab.locked:hover {
++  color: var(--text-2);
++}
+ 
+ /* Stat card */
+ .df-stat:hover { transform: translateY(-1px); transition: transform 150ms ease; }
+@@ -346,8 +405,8 @@ th, td {
+ /* Scrollbar */
+ ::-webkit-scrollbar { width: 8px; height: 8px; }
+ ::-webkit-scrollbar-track { background: var(--bg); }
+-::-webkit-scrollbar-thumb { background: #2a3848; border-radius: 8px; }
+-::-webkit-scrollbar-thumb:hover { background: #3a4858; }
++::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
++::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+ 
+ /* Odontogram */
+ .odont-card {
+@@ -542,8 +601,837 @@ th, td {
+   }
+ }
+ 
++/* ======================== */
++/* Patient View Modal (PVM) */
++/* ======================== */
++
++/* Overlay */
++.pvm-overlay {
++  position: fixed;
++  inset: 0;
++  z-index: 100;
++  background: rgba(0, 0, 0, 0.70);
++  backdrop-filter: blur(6px);
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  animation: pvm-overlay-in 200ms ease-out both;
++}
++
++@keyframes pvm-overlay-in {
++  from { opacity: 0; }
++  to   { opacity: 1; }
++}
++
++/* Container */
++.pvm-container {
++  /* Force light theme variables for clean clinical look and white background */
++  --teal: #0D9488;
++  --teal-dark: #0F766E;
++  --teal-accent: #0F766E;
++  --teal-light: rgba(13, 148, 136, 0.12);
++  --bg: #F5F8FA;
++  --bg-2: #FFFFFF;
++  --card: #FFFFFF;
++  --card-2: #F8FAFC;
++  --text: #0F172A;
++  --text-2: #475569;
++  --text-muted: #94A3B8;
++  --border: #D9E2EC;
++  --border-2: #CBD5E1;
++  --success: #059669;
++  --warning: #B45309;
++  --danger: #DC2626;
++  --scrollbar-thumb: #CBD5E1;
++  --scrollbar-thumb-hover: #94A3B8;
++  color-scheme: light;
++  color: var(--text);
++
++  position: relative;
++  width: 92vw;
++  max-width: 860px;
++  height: 90vh;
++  background: var(--card);
++  border-radius: 16px;
++  border: 1px solid var(--border);
++  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255, 255, 255, 0.04);
++  display: flex;
++  flex-direction: column;
++  overflow: hidden;
++  animation: pvm-slide-up 280ms ease-out both;
++}
++
++@keyframes pvm-slide-up {
++  from { opacity: 0; transform: translateY(24px) scale(0.97); }
++  to   { opacity: 1; transform: translateY(0) scale(1); }
++}
++
++/* Close button */
++.pvm-close-btn {
++  width: 36px;
++  height: 36px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  border-radius: 50%;
++  border: 1px solid var(--border);
++  background: var(--card-2);
++  color: var(--text-2);
++  cursor: pointer;
++  transition: all 150ms ease;
++  flex-shrink: 0;
++}
++
++.pvm-close-btn:hover {
++  background: var(--danger);
++  color: #fff;
++  border-color: var(--danger);
++  transform: scale(1.08);
++}
++
++/* Watermark Background */
++.pvm-watermark {
++  position: absolute;
++  top: 77px; /* Under the header */
++  left: 0;
++  right: 0;
++  bottom: 0;
++  background-repeat: no-repeat;
++  background-position: center 35%; /* position centered horizontally and balanced vertically */
++  background-size: 320px;
++  opacity: 0.055; /* clearly blend the image in background so that every information is visible clearly */
++  pointer-events: none;
++  z-index: 0;
++}
++
++/* Scrollable area */
++.pvm-scroll {
++  position: relative;
++  z-index: 1;
++  background: transparent;
++  flex: 1;
++  overflow-y: auto;
++  overflow-x: hidden;
++  padding: 24px 44px 24px;
++  scrollbar-width: thin;
++  scrollbar-color: var(--scrollbar-thumb) transparent;
++}
++
++/* Loading state */
++.pvm-loading {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  height: 100%;
++  gap: 16px;
++  color: var(--text-2);
++  font-size: 14px;
++}
++
++.pvm-loading-spinner {
++  width: 36px;
++  height: 36px;
++  border: 3px solid var(--border);
++  border-top-color: var(--teal);
++  border-radius: 50%;
++  animation: pvm-spin 700ms linear infinite;
++}
++
++@keyframes pvm-spin {
++  to { transform: rotate(360deg); }
++}
++
++/* Header ΓÇô fixed top bar */
++.pvm-header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 16px;
++  padding: 20px 24px;
++  border-bottom: 1px solid var(--border);
++  background: var(--card);
++  flex-shrink: 0;
++  position: relative;
++  z-index: 2;
++}
++
++.pvm-patient-name {
++  font-size: 24px;
++  font-weight: 700;
++  color: var(--text);
++  letter-spacing: -0.02em;
++  margin: 0;
++  white-space: nowrap;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  min-width: 0;
++}
++
++/* General section layout */
++.pvm-general-section {
++  display: flex;
++  gap: 32px;
++}
++
++.pvm-general-info {
++  flex: 1;
++  min-width: 0;
++}
++
++/* Photo section */
++.pvm-photo-section {
++  flex-shrink: 0;
++  width: 180px;
++}
++
++.pvm-patient-photo {
++  width: 180px;
++  height: 220px;
++  object-fit: cover;
++  border-radius: 12px;
++  border: 2px solid var(--border);
++  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
++}
++
++.pvm-photo-placeholder {
++  width: 180px;
++  height: 220px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  border-radius: 12px;
++  border: 1px solid var(--border);
++  background: #ffffff;
++  overflow: hidden;
++}
++
++.pvm-placeholder-logo {
++  width: 120px;
++  height: 120px;
++  object-fit: contain;
++  opacity: 0.35;
++  filter: saturate(0.5);
++}
++
++/* Section title */
++.pvm-section-title {
++  margin-bottom: 18px;
++}
++
++.pvm-section-title h2 {
++  font-size: 20px;
++  font-weight: 700;
++  color: var(--text);
++  margin: 0;
++}
++
++.pvm-section-underline {
++  width: 42px;
++  height: 3px;
++  background: var(--teal);
++  border-radius: 3px;
++  margin-top: 6px;
++}
++
++/* Info rows */
++.pvm-info-row {
++  display: flex;
++  align-items: flex-start;
++  gap: 8px;
++  padding: 8px 0;
++  font-size: 15px;
++  line-height: 1.5;
++}
++
++.pvm-info-icon {
++  color: var(--teal);
++  flex-shrink: 0;
++  margin-top: 3px;
++}
++
++.pvm-info-label {
++  font-weight: 700;
++  color: var(--text);
++  white-space: nowrap;
++  flex-shrink: 0;
++}
++
++.pvm-info-value {
++  color: var(--text-2);
++  word-break: break-word;
++}
++
++/* Sub-info rows (address) */
++.pvm-sub-info-row {
++  display: flex;
++  align-items: flex-start;
++  gap: 8px;
++  padding: 4px 0;
++  font-size: 14px;
++  line-height: 1.5;
++}
++
++.pvm-address-block {
++  padding: 8px 0;
++}
++
++.pvm-address-details {
++  padding-left: 24px;
++}
++
++/* Divider */
++.pvm-divider {
++  height: 1px;
++  background: var(--border);
++  margin: 28px 0;
++}
++
++/* Sections */
++.pvm-section {
++  /* Each data section */
++}
++
++.pvm-subsection {
++  margin-bottom: 18px;
++}
++
++.pvm-subsection-title {
++  font-size: 15px;
++  font-weight: 600;
++  color: var(--text);
++  margin: 0 0 10px;
++}
++
++/* Chip list */
++.pvm-chip-list {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++}
++
++.pvm-chip {
++  display: inline-flex;
++  align-items: center;
++  padding: 5px 14px;
++  border-radius: 999px;
++  font-size: 13px;
++  font-weight: 500;
++  background: var(--teal-light);
++  color: var(--teal-accent);
++  border: 1px solid rgba(20, 184, 184, 0.28);
++}
++
++/* Table */
++.pvm-table-wrapper {
++  overflow-x: auto;
++  border-radius: 10px;
++  border: 1px solid var(--border);
++}
++
++.pvm-table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 14px;
++}
++
++.pvm-table thead {
++  background: var(--card-2);
++}
++
++.pvm-table th {
++  text-align: left;
++  padding: 10px 14px;
++  font-size: 12px;
++  font-weight: 600;
++  text-transform: uppercase;
++  letter-spacing: 0.04em;
++  color: var(--text-2);
++  border-bottom: 1px solid var(--border);
++}
++
++.pvm-table td {
++  padding: 10px 14px;
++  color: var(--text);
++  border-bottom: 1px solid var(--border);
++}
++
++.pvm-table tbody tr:last-child td {
++  border-bottom: none;
++}
++
++.pvm-table tbody tr:hover {
++  background: var(--teal-light);
++}
++
++/* Tissue examination */
++.pvm-tissue-list {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++}
++
++.pvm-tissue-row {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding: 8px 14px;
++  border-radius: 8px;
++  border: 1px solid var(--border);
++  background: var(--card-2);
++}
++
++.pvm-tissue-name {
++  font-size: 14px;
++  font-weight: 500;
++  color: var(--text);
++}
++
++.pvm-tissue-status {
++  font-size: 12px;
++  font-weight: 500;
++  padding: 3px 12px;
++  border-radius: 999px;
++}
++
++.pvm-tissue-healthy {
++  background: rgba(52, 211, 153, 0.14);
++  color: var(--success);
++  border: 1px solid rgba(52, 211, 153, 0.30);
++}
++
++.pvm-tissue-attention {
++  background: rgba(251, 191, 36, 0.14);
++  color: var(--warning);
++  border: 1px solid rgba(251, 191, 36, 0.30);
++}
++
++.pvm-tissue-severe {
++  background: rgba(248, 113, 113, 0.14);
++  color: var(--danger);
++  border: 1px solid rgba(248, 113, 113, 0.30);
++}
++
++/* Totals grid */
++.pvm-totals-grid {
++  display: grid;
++  grid-template-columns: repeat(4, 1fr);
++  gap: 12px;
++  margin-bottom: 20px;
++}
++
++.pvm-total-item {
++  padding: 14px;
++  background: var(--card-2);
++  border-radius: 10px;
++  border: 1px solid var(--border);
++  text-align: center;
++}
++
++.pvm-total-label {
++  font-size: 11px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.04em;
++  color: var(--text-2);
++  margin-bottom: 4px;
++}
++
++.pvm-total-value {
++  font-size: 20px;
++  font-weight: 700;
++  color: var(--text);
++}
++
++.pvm-text-success { color: var(--success) !important; }
++.pvm-text-danger  { color: var(--danger) !important; }
++
++/* Visit cards */
++.pvm-visits-list {
++  display: flex;
++  flex-direction: column;
++  gap: 10px;
++}
++
++.pvm-visit-card {
++  padding: 14px 16px;
++  border-radius: 10px;
++  border: 1px solid var(--border);
++  background: var(--card-2);
++}
++
++.pvm-visit-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: flex-start;
++  gap: 12px;
++  flex-wrap: wrap;
++}
++
++.pvm-visit-date {
++  font-size: 13px;
++  color: var(--text-2);
++}
++
++.pvm-visit-treatment {
++  font-size: 15px;
++  font-weight: 600;
++  color: var(--text);
++  margin-top: 2px;
++}
++
++.pvm-visit-teeth {
++  font-size: 12px;
++  color: var(--text-2);
++  margin-top: 2px;
++}
++
++.pvm-visit-amounts {
++  text-align: right;
++  font-size: 13px;
++  color: var(--text);
++}
++
++.pvm-visit-note {
++  font-size: 13px;
++  color: var(--text-2);
++  margin-top: 8px;
++  line-height: 1.45;
++}
++
++.pvm-visit-followup {
++  font-size: 13px;
++  color: var(--teal-accent);
++  margin-top: 8px;
++  padding: 8px 12px;
++  border-radius: 8px;
++  background: var(--teal-light);
++  border: 1px solid rgba(20, 184, 184, 0.20);
++}
++
++/* Image gallery */
++.pvm-gallery {
++  margin-bottom: 20px;
++}
++
++.pvm-gallery-title {
++  font-size: 15px;
++  font-weight: 600;
++  color: var(--text);
++  margin: 0 0 12px;
++}
++
++.pvm-gallery-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
++  gap: 10px;
++}
++
++.pvm-gallery-item {
++  cursor: pointer;
++  border-radius: 10px;
++  overflow: hidden;
++  border: 1px solid var(--border);
++  transition: all 150ms ease;
++}
++
++.pvm-gallery-item:hover {
++  border-color: var(--teal);
++  transform: translateY(-2px);
++  box-shadow: 0 6px 18px rgba(20, 184, 184, 0.15);
++}
++
++.pvm-gallery-item img {
++  width: 100%;
++  height: 110px;
++  object-fit: cover;
++  display: block;
++}
++
++.pvm-gallery-name {
++  font-size: 11px;
++  padding: 6px 8px;
++  color: var(--text-2);
++  white-space: nowrap;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  background: var(--card-2);
++}
++
++/* Lightbox */
++.pvm-lightbox {
++  position: fixed;
++  inset: 0;
++  z-index: 200;
++  background: rgba(0, 0, 0, 0.88);
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  flex-direction: column;
++  animation: pvm-overlay-in 200ms ease-out both;
++}
++
++.pvm-lightbox img {
++  max-width: 90vw;
++  max-height: 80vh;
++  object-fit: contain;
++  border-radius: 8px;
++}
++
++.pvm-lightbox-close {
++  position: absolute;
++  top: 20px;
++  right: 20px;
++  width: 40px;
++  height: 40px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  border-radius: 50%;
++  border: 1px solid rgba(255, 255, 255, 0.20);
++  background: rgba(255, 255, 255, 0.10);
++  color: #fff;
++  cursor: pointer;
++  transition: background 150ms ease;
++}
++
++.pvm-lightbox-close:hover {
++  background: rgba(255, 255, 255, 0.25);
++}
++
++.pvm-lightbox-caption {
++  margin-top: 12px;
++  color: rgba(255, 255, 255, 0.75);
++  font-size: 13px;
++}
++
++/* Documents list */
++.pvm-docs-list {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++}
++
++.pvm-doc-item {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  padding: 10px 14px;
++  border-radius: 8px;
++  border: 1px solid var(--border);
++  background: var(--card-2);
++}
++
++.pvm-doc-icon {
++  color: var(--teal);
++  flex-shrink: 0;
++}
++
++.pvm-doc-info {
++  flex: 1;
++  min-width: 0;
++}
++
++.pvm-doc-name {
++  font-size: 14px;
++  font-weight: 500;
++  color: var(--text);
++  white-space: nowrap;
++  overflow: hidden;
++  text-overflow: ellipsis;
++}
++
++.pvm-doc-meta {
++  font-size: 12px;
++  color: var(--text-2);
++  margin-top: 2px;
++}
++
++.pvm-doc-type-badge {
++  display: inline-flex;
++  align-items: center;
++  padding: 3px 10px;
++  border-radius: 999px;
++  font-size: 11px;
++  font-weight: 500;
++  background: rgba(148, 163, 184, 0.12);
++  color: var(--text-2);
++  border: 1px solid var(--border);
++  flex-shrink: 0;
++}
++
++/* Signature */
++.pvm-signature-container {
++  padding: 16px;
++  background: #fff;
++  border-radius: 10px;
++  border: 1px solid var(--border);
++  display: inline-block;
++}
++
++.pvm-signature-img {
++  max-width: 300px;
++  max-height: 120px;
++  object-fit: contain;
++}
++
++/* Tooth summary */
++.pvm-tooth-summary {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++}
++
++.pvm-tooth-item {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  padding: 8px 14px;
++  border-radius: 8px;
++  border: 1px solid var(--border);
++  background: var(--card-2);
++  flex-wrap: wrap;
++}
++
++.pvm-tooth-number {
++  font-size: 14px;
++  font-weight: 600;
++  color: var(--teal-accent);
++  white-space: nowrap;
++  min-width: 80px;
++}
++
++.pvm-tooth-conditions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 6px;
++}
++
++.pvm-tooth-condition-chip {
++  font-size: 12px;
++  padding: 3px 10px;
++  border-radius: 999px;
++  background: rgba(251, 191, 36, 0.14);
++  color: var(--warning);
++  border: 1px solid rgba(251, 191, 36, 0.30);
++  font-weight: 500;
++}
++
++/* Empty text */
++.pvm-empty-text {
++  font-size: 14px;
++  color: var(--text-muted);
++  text-align: center;
++  padding: 20px 0;
++  font-style: italic;
++}
++
++/* Fixed Edit button */
++.pvm-edit-btn {
++  position: absolute;
++  bottom: 20px;
++  right: 20px;
++  z-index: 10;
++  display: inline-flex;
++  align-items: center;
++  gap: 8px;
++  padding: 10px 22px;
++  background: var(--teal);
++  color: #06161A;
++  border: none;
++  border-radius: 10px;
++  font-weight: 600;
++  font-size: 14px;
++  cursor: pointer;
++  transition: all 150ms ease;
++  box-shadow: 0 4px 16px rgba(20, 184, 184, 0.30);
++}
++
++.pvm-edit-btn:hover {
++  background: var(--teal-accent);
++  transform: translateY(-1px);
++  box-shadow: 0 6px 24px rgba(20, 184, 184, 0.40);
++}
++
++/* Responsive for modal */
++@media (max-width: 700px) {
++  .pvm-container {
++    width: 98vw;
++    height: 96vh;
++    border-radius: 12px;
++  }
++
++  .pvm-scroll {
++    padding: 28px 20px 16px;
++  }
++
++  .pvm-general-section {
++    flex-direction: column-reverse;
++    gap: 20px;
++  }
++
++  .pvm-photo-section {
++    width: 100%;
++    display: flex;
++    justify-content: center;
++  }
++
++  .pvm-patient-photo {
++    width: 140px;
++    height: 170px;
++  }
++
++  .pvm-photo-placeholder {
++    width: 140px;
++    height: 170px;
++  }
++
++  .pvm-patient-name {
++    font-size: 24px;
++  }
++
++  .pvm-totals-grid {
++    grid-template-columns: repeat(2, 1fr);
++  }
++
++  .pvm-visit-header {
++    flex-direction: column;
++  }
++
++  .pvm-visit-amounts {
++    text-align: left;
++  }
++}
++
++@media (max-width: 420px) {
++  .pvm-scroll {
++    padding: 24px 14px 12px;
++  }
++
++  .pvm-patient-name {
++    font-size: 20px;
++  }
++
++  .pvm-info-row {
++    font-size: 13px;
++  }
++
++  .pvm-totals-grid {
++    grid-template-columns: 1fr 1fr;
++    gap: 8px;
++  }
++
++  .pvm-total-value {
++    font-size: 16px;
++  }
++}
++
+ /* Recharts dark tweaks */
+ .recharts-cartesian-axis-tick-value { fill: var(--text-2) !important; }
++.recharts-label { fill: var(--text) !important; }
++.recharts-text.recharts-label { fill: var(--text) !important; }
++.recharts-pie-label-text { fill: var(--text) !important; }
++.recharts-pie-label-line { stroke: var(--text-2) !important; }
+ .recharts-default-tooltip {
+   background: var(--card-2) !important;
+   border: 1px solid var(--border) !important;

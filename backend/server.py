@@ -12,11 +12,14 @@ import jwt
 import certifi
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
+import cloudinary
+import cloudinary.uploader
 
 # ─── Setup ──────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +35,22 @@ db = client[os.environ["DB_NAME"]]
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
 ACCESS_TTL_HOURS = 24
+
+# Configure Cloudinary
+cloudinary_cloud = os.environ.get("CLOUDINARY_CLOUD_NAME")
+cloudinary_key = os.environ.get("CLOUDINARY_API_KEY")
+cloudinary_secret = os.environ.get("CLOUDINARY_API_SECRET")
+
+if (not cloudinary_cloud or not cloudinary_key or not cloudinary_secret or
+    "<your_api_key>" in cloudinary_key or "your_api_key" in cloudinary_key):
+    logger.warning("Cloudinary credentials are not fully configured in backend/.env. Uploads will fail until you configure them.")
+else:
+    cloudinary.config(
+        cloud_name=cloudinary_cloud,
+        api_key=cloudinary_key,
+        api_secret=cloudinary_secret,
+        secure=True
+    )
 
 app = FastAPI(title="DentaFlow API")
 api = APIRouter(prefix="/api")
@@ -210,6 +229,52 @@ async def delete_patient(pid: str, user=Depends(require_doctor)):
         raise HTTPException(404, "Patient not found")
     return {"ok": True}
 
+# ─── File Uploads (Cloudinary) ──────────────────────────────────────────────
+@api.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    user=Depends(get_current_user)
+):
+    try:
+        # Check if configured
+        if not cloudinary.config().cloud_name:
+            raise HTTPException(status_code=500, detail="Cloudinary is not configured in backend/.env")
+        
+        # Upload using the file.file stream
+        upload_result = cloudinary.uploader.upload(
+            file.file,
+            folder="dentaflow",
+            resource_type="auto"
+        )
+        return {
+            "url": upload_result.get("secure_url"),
+            "public_id": upload_result.get("public_id"),
+            "type": file.content_type or upload_result.get("resource_type")
+        }
+    except Exception as e:
+        logger.error(f"Cloudinary upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload to Cloudinary: {str(e)}")
+
+@api.delete("/upload/{public_id:path}")
+async def delete_file(
+    public_id: str,
+    user=Depends(get_current_user)
+):
+    try:
+        if not cloudinary.config().cloud_name:
+            raise HTTPException(status_code=500, detail="Cloudinary is not configured")
+        
+        # Try to delete as image first (default resource_type="image")
+        res = cloudinary.uploader.destroy(public_id, invalidate=True)
+        if res.get("result") != "ok":
+            # If not found or failed, try as raw file (e.g. PDF/Doc)
+            res = cloudinary.uploader.destroy(public_id, resource_type="raw", invalidate=True)
+            
+        return {"ok": True, "result": res.get("result")}
+    except Exception as e:
+        logger.error(f"Cloudinary destroy error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete from Cloudinary: {str(e)}")
+
 # ─── Treatments / Price Catalog ─────────────────────────────────────────────
 @api.get("/treatments")
 async def list_treatments(user=Depends(get_current_user)):
@@ -316,18 +381,56 @@ async def followups(user=Depends(get_current_user)):
     patients = await db.patients.find({}, {"_id": 0}).to_list(2000)
     today_list, upcoming = [], []
     for p in patients:
-        full_name = f"{p.get('general',{}).get('first_name','')} {p.get('general',{}).get('last_name','')}".strip()
-        for v in p.get("visits", []):
+        general = p.get("general", {})
+        medical = p.get("medical", {})
+        full_name = f"{general.get('first_name','')} {general.get('last_name','')}".strip()
+        visits = p.get("visits", [])
+        patient_due = sum(
+            max(float(visit.get("total", 0) or 0) - float(visit.get("paid", 0) or 0), 0)
+            for visit in visits
+        )
+        conditions = list(medical.get("diseases", []) or [])
+        if medical.get("other_disease"):
+            conditions.append(medical.get("other_disease"))
+        medications = [
+            " ".join(str(part) for part in [m.get("name", ""), m.get("dosage", ""), m.get("frequency", "")] if part).strip()
+            for m in (medical.get("medications", []) or [])
+        ]
+        sorted_visits = sorted(visits, key=lambda x: x.get("date", ""), reverse=True)
+        for v in visits:
             f = v.get("followup_date")
             if not f:
                 continue
+            previous_visits = [
+                {
+                    "date": pv.get("date", ""),
+                    "treatment": pv.get("treatment", ""),
+                    "diagnosis": pv.get("diagnosis", ""),
+                    "notes": pv.get("notes", ""),
+                    "teeth": pv.get("teeth", ""),
+                }
+                for pv in sorted_visits
+                if pv.get("id") != v.get("id")
+            ][:3]
             row = {
                 "patient_id": p["id"],
+                "visit_id": v.get("id", ""),
                 "patient_name": full_name,
-                "mobile": p.get("general", {}).get("mobile", ""),
+                "mobile": general.get("mobile", ""),
+                "age": general.get("dob", ""),
                 "followup_date": f,
                 "treatment": v.get("treatment", ""),
+                "scheduled_treatment": v.get("followup_treatment_plan", ""),
+                "previous_treatment": v.get("treatment", ""),
+                "previous_diagnosis": v.get("diagnosis", ""),
+                "previous_notes": v.get("notes", ""),
+                "teeth": v.get("teeth", ""),
                 "visit_date": v.get("date", ""),
+                "amount_due": patient_due,
+                "medical_alerts": conditions,
+                "medications": [m for m in medications if m],
+                "medical_notes": medical.get("notes", ""),
+                "recent_visits": previous_visits,
             }
             if f <= today:
                 today_list.append(row)
@@ -365,6 +468,7 @@ async def dashboard(user=Depends(get_current_user)):
                     "patient_name": f"{p.get('general',{}).get('first_name','')} {p.get('general',{}).get('last_name','')}".strip(),
                     "mobile": p.get("general", {}).get("mobile", ""),
                     "followup_date": v["followup_date"],
+                    "scheduled_treatment": v.get("followup_treatment_plan", ""),
                 })
     recent = sorted(patients, key=lambda x: x.get("created_at", ""), reverse=True)[:5]
     recent_out = [{
@@ -533,3 +637,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve Frontend static files (HTML/JS/CSS) & Single Page App client routing
+FRONTEND_BUILD = ROOT_DIR.parent / "frontend" / "build"
+
+@app.get("/{catchall:path}")
+async def serve_frontend(catchall: str):
+    # Check if the requested path corresponds to a static file in the build directory
+    file_path = FRONTEND_BUILD / catchall
+    if catchall and file_path.exists() and file_path.is_file():
+        return FileResponse(file_path)
+    
+    # Fallback to index.html for React router paths
+    index_path = FRONTEND_BUILD / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    
+    return {"message": "Frontend build not found. Please run 'npm run build' inside the frontend directory."}

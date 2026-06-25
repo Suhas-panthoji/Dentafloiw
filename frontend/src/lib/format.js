@@ -42,18 +42,15 @@ export const SPECIAL_INSTR = ["Before food","After food","With water","At bedtim
 export const REFERRAL_SOURCES = ["Walk-in","Friend or Family","Google","Doctor Referral","Social Media","Other"];
 
 export const TOOTH_CONDITIONS = [
-  { key: "healthy",  label: "Healthy",  color: "#FFFFFF" },
-  { key: "cavity",   label: "Cavity",   color: "#EF4444" },
-  { key: "filling",  label: "Filling",  color: "#3B82F6" },
-  { key: "crown",    label: "Crown",    color: "#FBBF24" },
-  { key: "rct",      label: "Root Canal", color: "#8B5CF6" },
-  { key: "missing",  label: "Missing",  color: "#9CA3AF" },
-  { key: "implant",  label: "Implant",  color: "#0A6E6E" },
-  { key: "planned",  label: "Planned",  color: "#BAE6FD" },
-  { key: "bridge",   label: "Bridge",   color: "#F472B6" },
-  { key: "veneer",   label: "Veneer",   color: "#C7D2FE" },
-  { key: "fractured",label: "Fractured",color: "#F97316" },
-  { key: "impacted", label: "Impacted", color: "#A78BFA" },
+  { key: "healthy",    label: "Healthy",    color: "#EAE5DA" },
+  { key: "missing",    label: "Missing",    color: "#A3A3A3" },
+  { key: "cavity",     label: "Cavity",     color: "#EB5757" },
+  { key: "planned",    label: "Planned",    color: "#EB5757" },
+  { key: "root-canal", label: "Root Canal", color: "#C88A75" },
+  { key: "filling",    label: "Filling",    color: "#2D9CDB" },
+  { key: "crown",      label: "Crown",      color: "#2F80ED" },
+  { key: "veneer",     label: "Veneer",     color: "#56CCF2" },
+  { key: "implant",    label: "Implant",    color: "#4F4F4F" },
 ];
 
 export const CONDITION_COLOR = Object.fromEntries(TOOTH_CONDITIONS.map((c) => [c.key, c.color]));

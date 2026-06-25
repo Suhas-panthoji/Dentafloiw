@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
+import { Agentation } from "agentation";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import LoginPage from "@/pages/LoginPage";
 import Layout from "@/components/Layout";
@@ -13,6 +14,15 @@ import FollowUpsPage from "@/pages/FollowUpsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import "@/App.css";
 
+const getInitialTheme = () => {
+  try {
+    return localStorage.getItem("dentaflow-theme") || "dark";
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+    return "dark";
+  }
+};
+
 function Protected({ children, doctorOnly = false }) {
   const { user, loading, isDoctor } = useAuth();
   if (loading) {
@@ -24,13 +34,28 @@ function Protected({ children, doctorOnly = false }) {
 }
 
 function App() {
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    try {
+      localStorage.setItem("dentaflow-theme", theme);
+    } catch {
+      // Keep the in-memory theme even if persistence is unavailable.
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
+
   return (
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-right" richColors />
+        {process.env.NODE_ENV === 'development' && <Agentation />}
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<Protected><Layout /></Protected>}>
+          <Route element={<Protected><Layout theme={theme} onToggleTheme={toggleTheme} /></Protected>}>
             <Route index element={<DashboardPage />} />
             <Route path="patients" element={<PatientsListPage />} />
             <Route path="patients/new" element={<PatientFormPage mode="new" />} />

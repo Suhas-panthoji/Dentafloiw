@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import {
-  LayoutDashboard, Users, Wallet, Tags, CalendarClock, Settings, LogOut, Menu, X,
+  LayoutDashboard, Users, Wallet, Tags, CalendarClock, Settings, LogOut, Menu, Moon, Sun, X,
 } from "lucide-react";
 
 function ToothLogo({ size = 22 }) {
@@ -23,10 +23,11 @@ const NAV = [
   { to: "/settings",  label: "Settings",      icon: Settings },
 ];
 
-export default function Layout() {
+export default function Layout({ theme = "dark", onToggleTheme }) {
   const { user, logout, isDoctor } = useAuth();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
+  const isDark = theme === "dark";
 
   return (
     <div className="min-h-screen flex">
@@ -72,6 +73,16 @@ export default function Layout() {
             </div>
           </div>
           <div className="df-header-user flex items-center gap-3 min-w-0" data-testid="header-user">
+            <button
+              type="button"
+              className="df-btn df-btn-ghost df-theme-toggle"
+              onClick={onToggleTheme}
+              aria-label={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+              data-testid="theme-toggle"
+            >
+              {isDark ? <Moon size={16}/> : <Sun size={16}/>}
+              <span>{isDark ? "Dark" : "Light"}</span>
+            </button>
             <div className="text-right hidden sm:block">
               <div className="text-sm font-medium">{user?.name}</div>
               <div className="text-[11px] text-[var(--text-2)]">{user?.email}</div>

@@ -8,7 +8,7 @@ const blank = () => ({
   date: todayISO(),
   complaint: "", diagnosis: "", treatment: "Consultation", notes: "",
   teeth: "", fee: 0, lab_cost: 0, radio_cost: 0, other_cost: 0,
-  paid: 0, followup_date: "",
+  paid: 0, followup_date: "", followup_treatment_plan: "",
 });
 
 export default function VisitForm({ visit, treatments = [], onSave, onCancel }) {
@@ -52,6 +52,18 @@ export default function VisitForm({ visit, treatments = [], onSave, onCancel }) 
         <div><label className="df-label">Schedule Follow-up?</label>
           <input type="date" className="df-input" value={v.followup_date || ""} onChange={(e) => set("followup_date", e.target.value)} data-testid="followup-date"/></div>
       </div>
+
+      {v.followup_date && (
+        <div><label className="df-label">Planned Follow-up Treatment</label>
+          <textarea
+            className="df-input"
+            rows={2}
+            value={v.followup_treatment_plan || ""}
+            onChange={(e) => set("followup_treatment_plan", e.target.value)}
+            placeholder="Example: RCT second sitting, crown trial, suture removal, review healing"
+            data-testid="followup-treatment-plan"
+          /></div>
+      )}
 
       <div><label className="df-label">Treatment Notes</label>
         <textarea className="df-input" rows={3} value={v.notes} onChange={(e) => set("notes", e.target.value)}/></div>

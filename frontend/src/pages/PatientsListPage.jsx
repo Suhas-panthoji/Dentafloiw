@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Search, UserPlus, Trash2, Phone, Eye, MapPin } from "lucide-react";
 import { api, formatErr } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { fmtDate, fullName, inr } from "@/lib/format";
 import { toast } from "sonner";
+import PatientViewModal from "@/components/PatientViewModal";
 
 function patientDue(p) {
   return (p.visits || []).reduce((s, v) => s + Math.max((+v.total || 0) - (+v.paid || 0), 0), 0);
@@ -21,6 +22,7 @@ export default function PatientsListPage() {
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [confirmId, setConfirmId] = useState(null);
+  const [viewPatientId, setViewPatientId] = useState(null);
   const nav = useNavigate();
   const PAGE_SIZE = 20;
 
@@ -122,9 +124,9 @@ export default function PatientsListPage() {
                     </div>
                   </div>
                   {due > 0 && <span className="df-badge df-badge-red shrink-0" data-testid={`due-badge-${p.id}`}>Due {inr(due)}</span>}
-                  <Link to={`/patients/${p.id}`} className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]" data-testid={`view-patient-${p.id}`}>
+                  <button onClick={() => setViewPatientId(p.id)} className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]" data-testid={`view-patient-${p.id}`}>
                     <Eye size={14}/> View
-                  </Link>
+                  </button>
                   {isDoctor && (
                     <button className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]"
                             style={{ color: "var(--danger)", borderColor: "rgba(248,113,113,0.30)" }}
@@ -159,6 +161,14 @@ export default function PatientsListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewPatientId && (
+        <PatientViewModal
+          patientId={viewPatientId}
+          onClose={() => setViewPatientId(null)}
+          onEdit={(id) => { setViewPatientId(null); nav(`/patients/${id}`); }}
+        />
       )}
     </div>
   );
