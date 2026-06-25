@@ -1,4 +1,5 @@
 import axios from "axios";
+import { safeStorage } from "./storage";
 
 const configuredBackendUrl = process.env.REACT_APP_BACKEND_URL?.trim();
 const BACKEND_URL = configuredBackendUrl && configuredBackendUrl !== "auto"
@@ -9,7 +10,7 @@ export const API_BASE = `${BACKEND_URL}/api`;
 export const api = axios.create({ baseURL: API_BASE });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("df_token");
+  const token = safeStorage.getItem("df_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -20,7 +21,7 @@ api.interceptors.response.use(
     if (err.response && err.response.status === 401) {
       const path = window.location.pathname;
       if (path !== "/login") {
-        localStorage.removeItem("df_token");
+        safeStorage.removeItem("df_token");
         window.location.href = "/login";
       }
     }

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { Agentation } from "agentation";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { safeStorage } from "@/lib/storage";
 import LoginPage from "@/pages/LoginPage";
 import Layout from "@/components/Layout";
 import DashboardPage from "@/pages/DashboardPage";
@@ -16,7 +17,7 @@ import "@/App.css";
 
 const getInitialTheme = () => {
   try {
-    return localStorage.getItem("dentaflow-theme") || "dark";
+    return safeStorage.getItem("dentaflow-theme") || "dark";
   } catch {
     // localStorage can be unavailable in restricted browser contexts.
     return "dark";
@@ -40,7 +41,7 @@ function App() {
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle("dark", theme === "dark");
     try {
-      localStorage.setItem("dentaflow-theme", theme);
+      safeStorage.setItem("dentaflow-theme", theme);
     } catch {
       // Keep the in-memory theme even if persistence is unavailable.
     }
