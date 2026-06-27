@@ -1,8 +1,8 @@
 # Stage 1: Build React Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/yarn.lock* ./
-RUN yarn install --frozen-lockfile || npm install
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --legacy-peer-deps
 COPY frontend/ ./
 ENV REACT_APP_BACKEND_URL=""
 RUN npm run build
@@ -11,9 +11,14 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (including libs for python-jq)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libjq-dev \
+    libonig-dev \
+    autoconf \
+    automake \
+    libtool \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend requirements and install

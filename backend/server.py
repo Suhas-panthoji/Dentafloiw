@@ -2,7 +2,11 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / ".env")
+# In Docker/HF Spaces, env vars come from the container environment (HF Secrets).
+# The .env file only exists for local development.
+env_path = ROOT_DIR / ".env"
+if env_path.exists():
+    load_dotenv(env_path, override=False)
 
 import os
 import uuid
@@ -630,10 +634,13 @@ async def shutdown():
     client.close()
 
 app.include_router(api)
+cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
+cors_origins = [o.strip() for o in cors_origins if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
-    allow_credentials=False,
+    allow_origins=cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
