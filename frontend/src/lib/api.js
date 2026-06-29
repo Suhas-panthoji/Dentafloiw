@@ -1,6 +1,7 @@
 import axios from "axios";
 import { safeStorage } from "./storage";
 
+// Configured backend URL (statically replaced by Vercel/CRA during build)
 const configuredBackendUrl = process.env.REACT_APP_BACKEND_URL?.trim();
 const BACKEND_URL = configuredBackendUrl && configuredBackendUrl !== "auto"
   ? configuredBackendUrl
