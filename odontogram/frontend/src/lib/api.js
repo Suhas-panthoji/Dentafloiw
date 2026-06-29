@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Points to the ODONTOGRAM standalone backend on port 8001
-const configuredBackendUrl = process.env.REACT_APP_BACKEND_URL?.trim();
+const configuredBackendUrl = (process.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_API_URL)?.trim();
 const BACKEND_URL =
   configuredBackendUrl && configuredBackendUrl !== "auto"
     ? configuredBackendUrl
