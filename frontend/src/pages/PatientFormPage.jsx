@@ -49,8 +49,11 @@ export default function PatientFormPage({ mode }) {
   const [editingVisit, setEditingVisit] = useState(null);
   const [saving, setSaving] = useState(false);
   const [showVisitForm, setShowVisitForm] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const fileRefs = useRef({});
   const cameraInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const generalInfoSaved = isEdit || Boolean(p.id);
 
   useEffect(() => {
@@ -61,6 +64,15 @@ export default function PatientFormPage({ mode }) {
       api.get(`/patients/${id}`).then((r) => setP({ ...emptyPatient(), ...r.data })).catch((e) => toast.error(formatErr(e)));
     }
   }, [isEdit, id]);
+
+  // Clean up camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
 
   const ageBadge = useMemo(() => {
     const a = calcAge(p.general.dob);
@@ -129,33 +141,62 @@ export default function PatientFormPage({ mode }) {
     setP((x) => ({ ...x, visits: x.visits.filter((v) => v.id !== vid) }));
   };
 
-  // Photo capture
+  // Photo capture – viewfinder approach
   const startCamera = async () => {
-
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      // Fallback: open native file picker with rear camera hint
       cameraInputRef.current?.click();
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const video = document.createElement("video");
-      video.srcObject = stream; await video.play();
-      const canvas = document.createElement("canvas");
-      canvas.width = 320; canvas.height = 240;
-      // give camera time
-      await new Promise((r) => setTimeout(r, 500));
-      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-      const data = canvas.toDataURL("image/png");
-      stream.getTracks().forEach((t) => t.stop());
-      
-      toast.loading("Uploading photo...", { id: "upload-photo" });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+      });
+      streamRef.current = stream;
+      setShowCamera(true);
+      // Attach stream to video element after modal renders
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      });
+    } catch (e) {
+      // Camera access denied or unavailable – fall back to file input
+      cameraInputRef.current?.click();
+      toast.info("Choose camera to take a photo");
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    const data = canvas.toDataURL("image/png");
+
+    // Stop the camera stream immediately
+    stopCamera();
+
+    toast.loading("Uploading photo...", { id: "upload-photo" });
+    try {
       const res = await uploadBase64(data, "profile_camera.png");
       setP((x) => ({ ...x, photo: res.url }));
       toast.success("Photo captured and uploaded", { id: "upload-photo" });
     } catch (e) {
-      cameraInputRef.current?.click();
-      toast.info("Choose camera to take a photo");
+      toast.error("Failed to upload photo", { id: "upload-photo" });
     }
   };
 
@@ -744,6 +785,94 @@ export default function PatientFormPage({ mode }) {
         </div>
       )}
       </fieldset>
+
+      {/* Camera Viewfinder Modal */}
+      {showCamera && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.85)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          padding: "16px",
+        }} data-testid="camera-modal">
+          <div style={{
+            background: "var(--card-bg, #0f1620)",
+            borderRadius: "16px",
+            border: "1px solid var(--border, #1e2a38)",
+            overflow: "hidden",
+            maxWidth: "520px",
+            width: "100%",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid var(--border, #1e2a38)",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-1, #e6eaf0)" }}>
+                <Camera size={14} style={{ display: "inline", marginRight: "6px", verticalAlign: "-2px" }}/> Take Photo
+              </span>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="df-btn df-btn-ghost"
+                style={{ padding: "4px 8px" }}
+                data-testid="camera-close-btn"
+              >
+                <X size={16}/>
+              </button>
+            </div>
+
+            <div style={{ position: "relative", background: "#000", lineHeight: 0 }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: "100%",
+                  maxHeight: "60vh",
+                  objectFit: "cover",
+                  display: "block",
+                  transform: "scaleX(1)",
+                }}
+              />
+            </div>
+
+            <div style={{
+              padding: "16px",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
+            }}>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="df-btn df-btn-ghost"
+                style={{ minWidth: "100px" }}
+                data-testid="camera-cancel-btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={capturePhoto}
+                className="df-btn"
+                style={{
+                  minWidth: "140px",
+                  background: "var(--teal-accent, #14b8b8)",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  padding: "10px 20px",
+                  borderRadius: "999px",
+                }}
+                data-testid="camera-capture-btn"
+              >
+                <Camera size={16}/> Capture
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
