@@ -1,5 +1,8 @@
 from dotenv import load_dotenv
 from pathlib import Path
+import asyncio
+import urllib.request
+import sys
 
 ROOT_DIR = Path(__file__).parent
 # In Docker/HF Spaces, env vars come from the container environment (HF Secrets).
@@ -625,9 +628,56 @@ async def seed():
             await db.patients.insert_one(doc)
     logger.info("Seed complete")
 
+def ping_url(url: str):
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={'User-Agent': 'DentaFlow-KeepAlive'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status, None
+    except Exception as e:
+        return None, str(e)
+
+async def keep_alive_loop():
+    # Wait 30 seconds after startup to let the server fully initialize
+    await asyncio.sleep(30)
+    
+    self_ping_url = os.environ.get("SELF_PING_URL")
+    railway_url = os.environ.get("RAILWAY_STATIC_URL")
+    
+    if self_ping_url:
+        target = self_ping_url
+    elif railway_url:
+        target = railway_url if railway_url.startswith("http") else f"https://{railway_url}"
+    else:
+        # Fallback: ping Google to generate outbound traffic (which resets Railway's inactivity timer)
+        target = "https://www.google.com"
+        
+    logger.info(f"Keep-alive system started. Target URL: {target}")
+    
+    while True:
+        try:
+            if sys.version_info >= (3, 9):
+                status, err = await asyncio.to_thread(ping_url, target)
+            else:
+                loop = asyncio.get_running_loop()
+                status, err = await loop.run_in_executor(None, ping_url, target)
+                
+            if status:
+                logger.info(f"Keep-alive ping to {target} succeeded (status: {status})")
+            else:
+                logger.warning(f"Keep-alive ping to {target} failed: {err}")
+        except Exception as e:
+            logger.error(f"Keep-alive loop error: {e}")
+            
+        # Sleep for 9 minutes (540 seconds)
+        await asyncio.sleep(540)
+
 @app.on_event("startup")
 async def startup():
     await seed()
+    asyncio.create_task(keep_alive_loop())
 
 @app.on_event("shutdown")
 async def shutdown():

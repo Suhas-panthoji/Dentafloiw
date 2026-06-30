@@ -125,7 +125,6 @@ export default function PatientFormPage({ mode }) {
   }, [p.visits]);
 
   const onSaveVisit = (v) => {
-    if (!canEdit) return;
     if (!requireSavedGeneral()) return;
     setP((x) => {
       const exists = x.visits.find((y) => y.id === v.id);

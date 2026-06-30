@@ -16,8 +16,8 @@ function ToothLogo() {
 export default function LoginPage() {
   const { user, login } = useAuth();
   const nav = useNavigate();
-  const [email, setEmail] = useState("doctor@clinic.com");
-  const [password, setPassword] = useState("doctor123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -64,11 +64,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 p-3 rounded-lg bg-[var(--teal-light)] text-[12px] text-[var(--text-2)] leading-relaxed">
-          <div className="font-medium text-[var(--teal)] mb-1">Demo credentials</div>
-          Doctor — <code>doctor@clinic.com</code> / <code>doctor123</code><br/>
-          Staff &nbsp;— <code>staff@clinic.com</code> / <code>staff123</code>
-        </div>
+
       </div>
     </div>
   );
