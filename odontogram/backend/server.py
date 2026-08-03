@@ -230,9 +230,12 @@ async def seed_user(email: str, password: str, name: str, role: str):
             "role": role,
             "created_at": now_iso(),
         })
-    elif not verify_pw(password, existing["password_hash"]):
+    else:
+        update_fields = {"name": name, "role": role}
+        if not verify_pw(password, existing["password_hash"]):
+            update_fields["password_hash"] = hash_pw(password)
         await db.users.update_one(
-            {"email": email}, {"$set": {"password_hash": hash_pw(password)}}
+            {"email": email}, {"$set": update_fields}
         )
 
 SAMPLE_ODONTOGRAMS = [
@@ -271,7 +274,7 @@ SAMPLE_ODONTOGRAMS = [
 async def seed():
     await db.users.create_index("email", unique=True)
     await db.odontograms.create_index("id", unique=True)
-    await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Asha Menon", "doctor")
+    await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Naveen Shamanur", "doctor")
     await seed_user(os.environ["STAFF_EMAIL"], os.environ["STAFF_PASSWORD"], "Kavita Reddy", "staff")
     if await db.odontograms.count_documents({}) == 0:
         for sample in SAMPLE_ODONTOGRAMS:

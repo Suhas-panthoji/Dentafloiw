@@ -594,15 +594,18 @@ async def seed_user(email: str, password: str, name: str, role: str):
             "role": role,
             "created_at": now_iso(),
         })
-    elif not verify_pw(password, existing["password_hash"]):
+    else:
+        update_fields = {"name": name, "role": role}
+        if not verify_pw(password, existing["password_hash"]):
+            update_fields["password_hash"] = hash_pw(password)
         await db.users.update_one(
-            {"email": email}, {"$set": {"password_hash": hash_pw(password)}}
+            {"email": email}, {"$set": update_fields}
         )
 
 async def seed():
     await db.users.create_index("email", unique=True)
     await db.patients.create_index("id", unique=True)
-    await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Asha Menon", "doctor")
+    await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Naveen Shamanur", "doctor")
     await seed_user(os.environ["STAFF_EMAIL"], os.environ["STAFF_PASSWORD"], "Kavita Reddy", "staff")
     if await db.treatments.count_documents({}) == 0:
         for t in DEMO_TREATMENTS:
@@ -644,14 +647,17 @@ async def keep_alive_loop():
     await asyncio.sleep(30)
     
     self_ping_url = os.environ.get("SELF_PING_URL")
+    render_url = os.environ.get("RENDER_EXTERNAL_URL")
     railway_url = os.environ.get("RAILWAY_STATIC_URL")
     
     if self_ping_url:
         target = self_ping_url
+    elif render_url:
+        target = render_url if render_url.startswith("http") else f"https://{render_url}"
     elif railway_url:
         target = railway_url if railway_url.startswith("http") else f"https://{railway_url}"
     else:
-        # Fallback: ping Google to generate outbound traffic (which resets Railway's inactivity timer)
+        # Fallback: ping Google to generate outbound traffic
         target = "https://www.google.com"
         
     logger.info(f"Keep-alive system started. Target URL: {target}")

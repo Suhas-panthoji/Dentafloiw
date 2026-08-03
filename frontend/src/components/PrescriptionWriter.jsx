@@ -6,7 +6,7 @@ import { COMMON_DRUGS, PRX_FREQ, DURATIONS, SPECIAL_INSTR, fmtDate, calcAge, ful
 
 const blankRx = () => ({ name: "", dosage: "", frequency: "Twice daily", duration: "5 days", instr: "After food" });
 
-export default function PrescriptionWriter({ patient, doctorName = "Dr. Asha Menon" }) {
+export default function PrescriptionWriter({ patient, doctorName = "Dr. Naveen Shamanur" }) {
   const [open, setOpen] = useState(false);
   const [rx, setRx] = useState([blankRx()]);
   const [errors, setErrors] = useState([]);

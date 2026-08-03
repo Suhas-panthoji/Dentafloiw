@@ -20,6 +20,7 @@ export default function Tooth({
   surfaces = [],
   isSelected,
   treatedThisVisit,
+  treatedElsewhere = false,
   onClick,
   onContextMenu,
 }) {
@@ -215,6 +216,20 @@ export default function Tooth({
             y2={centerY + 14}
           />
         </g>
+        {/* Arrow if treated elsewhere */}
+        {treatedElsewhere && (
+          tooth.row === "upper" ? (
+            <g stroke="#000000" fill="#000000" pointerEvents="none">
+              <line x1="0" y1="-30" x2="0" y2="-6" strokeWidth="3.5" strokeLinecap="round" />
+              <polygon points="-6,-14 0,-4 6,-14" />
+            </g>
+          ) : (
+            <g stroke="#000000" fill="#000000" pointerEvents="none">
+              <line x1="0" y1={path.h + 30} x2="0" y2={path.h + 6} strokeWidth="3.5" strokeLinecap="round" />
+              <polygon points={`-6,${path.h + 14} 0,${path.h + 4} 6,${path.h + 14}`} />
+            </g>
+          )
+        )}
       </g>
     );
   }
@@ -300,6 +315,20 @@ export default function Tooth({
           pointerEvents="none"
         />
       ))}
+      {/* Arrow if treated elsewhere */}
+      {treatedElsewhere && (
+        tooth.row === "upper" ? (
+          <g stroke="#000000" fill="#000000" pointerEvents="none">
+            <line x1="0" y1="-30" x2="0" y2="-6" strokeWidth="3.5" strokeLinecap="round" />
+            <polygon points="-6,-14 0,-4 6,-14" />
+          </g>
+        ) : (
+          <g stroke="#000000" fill="#000000" pointerEvents="none">
+            <line x1="0" y1={path.h + 30} x2="0" y2={path.h + 6} strokeWidth="3.5" strokeLinecap="round" />
+            <polygon points={`-6,${path.h + 14} 0,${path.h + 4} 6,${path.h + 14}`} />
+          </g>
+        )
+      )}
     </g>
   );
 }

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useRef } from "react";
 import Tooth from "./Tooth";
 import ToothPopup from "./ToothPopup";
 import ToothContextMenu from "./ToothContextMenu";
+import { getToothPath } from "./toothPaths";
 import {
   CONDITION_LEGEND,
   CONDITION_OPTIONS,
@@ -23,12 +24,17 @@ function sortTeeth(numbers) {
   return numbers.slice().sort((a, b) => Number(a) - Number(b));
 }
 
-function upsertRecord(records, tooth, condition, surfaces = []) {
+function upsertRecord(records, tooth, condition, surfaces = [], treatedElsewhere = undefined) {
   const norm = normalizeCondition(condition);
   const without = records.filter((r) => r.tooth !== tooth);
+  const existing = records.find((r) => r.tooth === tooth);
+  const finalTreatedElsewhere = treatedElsewhere !== undefined 
+    ? treatedElsewhere 
+    : (existing ? existing.treatedElsewhere : false);
+  const treatedThisVisit = existing ? existing.treatedThisVisit : false;
   return [
     ...without,
-    { tooth, condition: norm, surfaces, treatedThisVisit: false },
+    { tooth, condition: norm, surfaces, treatedThisVisit, treatedElsewhere: finalTreatedElsewhere },
   ].sort((a, b) => Number(a.tooth) - Number(b.tooth));
 }
 
@@ -107,8 +113,8 @@ export default function Odontogram({ value, onChange, readOnly = false }) {
 
   // ── Popup apply ────────────────────────────────────────────────────
   const handleApply = useCallback(
-    (toothNumber, condition, surfaces) => {
-      const nextRecords = upsertRecord(records, toothNumber, condition, surfaces);
+    (toothNumber, condition, surfaces, treatedElsewhere) => {
+      const nextRecords = upsertRecord(records, toothNumber, condition, surfaces, treatedElsewhere);
       emitChange(nextRecords, toothNumber, normalizeCondition(condition));
     },
     [records, emitChange]
@@ -215,6 +221,7 @@ export default function Odontogram({ value, onChange, readOnly = false }) {
                     surfaces={data.surfaces || []}
                     isSelected={popup?.toothNumber === t.number}
                     treatedThisVisit={treatedTeeth.has(t.number)}
+                    treatedElsewhere={data.treatedElsewhere || false}
                     onClick={handleToothClick}
                     onContextMenu={handleContextMenu}
                   />
@@ -232,6 +239,7 @@ export default function Odontogram({ value, onChange, readOnly = false }) {
                     surfaces={data.surfaces || []}
                     isSelected={popup?.toothNumber === t.number}
                     treatedThisVisit={treatedTeeth.has(t.number)}
+                    treatedElsewhere={data.treatedElsewhere || false}
                     onClick={handleToothClick}
                     onContextMenu={handleContextMenu}
                   />

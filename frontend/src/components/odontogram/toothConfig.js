@@ -212,6 +212,7 @@ export function normalizeTeethRecords(value) {
         condition: normalizeCondition(record?.condition),
         surfaces: record?.surfaces || [],
         treatedThisVisit: record?.treatedThisVisit || false,
+        treatedElsewhere: record?.treatedElsewhere || false,
       }))
       .filter((record) => record.tooth);
   }
@@ -223,6 +224,7 @@ export function normalizeTeethRecords(value) {
         condition: conditionFromLegacyValue(data),
         surfaces: data?.surfaces || [],
         treatedThisVisit: data?.treatedThisVisit || false,
+        treatedElsewhere: data?.treatedElsewhere || false,
       }))
       .filter((record) => record.tooth);
   }
@@ -237,6 +239,7 @@ export function recordsToConditionMap(records) {
       condition: normalizeCondition(record.condition),
       surfaces: record.surfaces || [],
       treatedThisVisit: record.treatedThisVisit || false,
+      treatedElsewhere: record.treatedElsewhere || false,
     };
   });
   return map;

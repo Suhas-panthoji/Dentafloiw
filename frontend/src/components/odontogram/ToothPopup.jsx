@@ -34,7 +34,16 @@ export default function ToothPopup({
 }) {
   const [condition, setCondition] = useState(currentCondition);
   const [surfaces, setSurfaces] = useState(new Set(currentSurfaces));
+  const [askingTreated, setAskingTreated] = useState(false);
   const ref = useRef(null);
+
+  // Position the popup
+  const style = {
+    position: "fixed",
+    left: Math.min(position?.x || 0, window.innerWidth - 320),
+    top: Math.min(position?.y || 0, window.innerHeight - 400),
+    zIndex: 1000,
+  };
 
   // Close on outside click
   useEffect(() => {
@@ -66,21 +75,58 @@ export default function ToothPopup({
   };
 
   const handleApply = () => {
-    onApply?.(toothNumber, condition, Array.from(surfaces));
-    onClose?.();
+    setAskingTreated(true);
   };
 
   const handleMarkTreated = () => {
     onMarkTreated?.(toothNumber);
   };
 
-  // Position the popup
-  const style = {
-    position: "fixed",
-    left: Math.min(position?.x || 0, window.innerWidth - 320),
-    top: Math.min(position?.y || 0, window.innerHeight - 400),
-    zIndex: 1000,
-  };
+  if (askingTreated) {
+    return (
+      <div ref={ref} className="odont-popup" style={style}>
+        {/* Header */}
+        <div className="odont-popup-header">
+          <div>
+            <div className="odont-popup-tooth-num">Tooth {toothNumber}</div>
+            <div className="odont-popup-tooth-name">{toothName(toothNumber)}</div>
+          </div>
+          <button className="odont-popup-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <div className="odont-popup-section" style={{ padding: "16px 14px" }}>
+          <div className="odont-popup-label" style={{ fontSize: "12px", textTransform: "none", color: "var(--text)", marginBottom: "14px", lineHeight: "1.4" }}>
+            Is it treated before in any other hospitals?
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              className="odont-popup-apply"
+              onClick={() => {
+                onApply?.(toothNumber, condition, Array.from(surfaces), true);
+                onClose?.();
+              }}
+              type="button"
+            >
+              Yes
+            </button>
+            <button
+              className="odont-popup-apply"
+              style={{ backgroundColor: "var(--card-2)", border: "1px solid var(--border)", color: "var(--text)" }}
+              onClick={() => {
+                onApply?.(toothNumber, condition, Array.from(surfaces), false);
+                onClose?.();
+              }}
+              type="button"
+            >
+              No
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="odont-popup" style={style}>
