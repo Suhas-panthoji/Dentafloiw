@@ -31,12 +31,13 @@ COPY backend/ ./backend/
 # Copy React build artifact from Stage 1
 COPY --from=frontend-builder /app/frontend/build ./frontend/build
 
-# Set environment variables and working directory
-ENV PORT=7860
+# Set default environment variable and working directory
+ENV PORT=10000
 WORKDIR /app/backend
 
-# Expose port 7860 (Hugging Face Spaces default port)
-EXPOSE 7860
+# Expose port 10000 (Render default web service port)
+EXPOSE 10000
 
-# Run uvicorn server on port 7860
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run uvicorn server on dynamic $PORT
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-10000}"]
+
