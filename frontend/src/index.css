@@ -525,15 +525,6 @@ th, td {
   font-family: 'Inter', sans-serif;
 }
 
-/* Five-surface boxes */
-.odont-surf {
-  cursor: pointer;
-  transition: stroke 120ms ease;
-}
-.odont-surf:hover {
-  stroke: #0D9488;
-  stroke-width: 2;
-}
 
 /* Tooth hover effect */
 .odont-tooth {
@@ -611,28 +602,6 @@ th, td {
   font-weight: 500;
 }
 
-.odont-surface-key-body {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.odont-surface-key-svg {
-  flex-shrink: 0;
-}
-
-.odont-surface-key-text {
-  font-size: 9px;
-  font-weight: 600;
-  fill: #5B4E42;
-  font-family: 'Inter', sans-serif;
-}
-
-.odont-surface-key-note {
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-2);
-}
 
 .odont-panel-section {
   margin-bottom: 14px;

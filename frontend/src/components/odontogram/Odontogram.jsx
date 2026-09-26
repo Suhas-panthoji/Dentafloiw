@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useId } from "react";
 import Tooth from "./Tooth";
-import SurfaceBox from "./SurfaceBox";
 import ToothPopup from "./ToothPopup";
 import ToothContextMenu from "./ToothContextMenu";
 import {
@@ -129,21 +128,9 @@ function ArchChart({ set, uid, conditionMap, popupTooth, treatedTeeth, readOnly,
       <text x="32" y={layout.midY + 9} textAnchor="middle" className="odont-rl-label">R</text>
       <text x={layout.width - 32} y={layout.midY + 9} textAnchor="middle" className="odont-rl-label">L</text>
 
-      {rows.map((row) => row.map((t) => {
-        const data = conditionMap[t.number] || {};
-        return (
-          <g key={`meta-${t.number}`}>
-            <text x={t.x} y={t.numY} textAnchor="middle" className="odont-tooth-num">{t.number}</text>
-            <SurfaceBox
-              tooth={t}
-              condition={data.condition || "HEALTHY"}
-              surfaces={data.surfaces || []}
-              readOnly={readOnly}
-              onSurfaceClick={onToothClick}
-            />
-          </g>
-        );
-      }))}
+      {rows.map((row) => row.map((t) => (
+        <text key={`num-${t.number}`} x={t.x} y={t.numY} textAnchor="middle" className="odont-tooth-num">{t.number}</text>
+      )))}
 
       {rows.map((row, ri) => (
         <g key={ri} filter={`url(#${uid}-shadow)`}>
@@ -168,30 +155,6 @@ function ArchChart({ set, uid, conditionMap, popupTooth, treatedTeeth, readOnly,
       ))}
 
       {connectors}
-    </svg>
-  );
-}
-
-function SurfaceKey() {
-  const S = 44;
-  const x = 8;
-  const y = 8;
-  const a = S * 0.29;
-  const poly = (pts) => <polygon points={pts} fill="#FFFFFF" stroke="#8A7E70" strokeWidth="1" />;
-  return (
-    <svg viewBox="0 0 60 60" width="60" height="60" aria-hidden="true" className="odont-surface-key-svg">
-      {poly(`${x},${y} ${x + S},${y} ${x + S - a},${y + a} ${x + a},${y + a}`)}
-      {poly(`${x},${y + S} ${x + S},${y + S} ${x + S - a},${y + S - a} ${x + a},${y + S - a}`)}
-      {poly(`${x},${y} ${x + a},${y + a} ${x + a},${y + S - a} ${x},${y + S}`)}
-      {poly(`${x + S},${y} ${x + S - a},${y + a} ${x + S - a},${y + S - a} ${x + S},${y + S}`)}
-      {poly(`${x + a},${y + a} ${x + S - a},${y + a} ${x + S - a},${y + S - a} ${x + a},${y + S - a}`)}
-      <g className="odont-surface-key-text" textAnchor="middle">
-        <text x={x + S / 2} y={y + a - 3}>B</text>
-        <text x={x + S / 2} y={y + S - 3}>L</text>
-        <text x={x + a / 2} y={y + S / 2 + 3}>D</text>
-        <text x={x + S - a / 2} y={y + S / 2 + 3}>M</text>
-        <text x={x + S / 2} y={y + S / 2 + 3}>O</text>
-      </g>
     </svg>
   );
 }
@@ -243,7 +206,7 @@ export default function Odontogram({ value, onChange, readOnly = false, defaultD
 
   // ── Click handler (opens popup) ────────────────────────────────────
   const handleToothClick = useCallback(
-    (toothNumber, event, surface) => {
+    (toothNumber, event) => {
       if (readOnly) return;
       setCtxMenu(null);
       const rect = event.currentTarget?.getBoundingClientRect
@@ -251,7 +214,6 @@ export default function Odontogram({ value, onChange, readOnly = false, defaultD
         : { left: event.clientX, top: event.clientY, width: 0, height: 0 };
       setPopup({
         toothNumber,
-        surface: surface || null,
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height + 8,
       });
@@ -383,17 +345,6 @@ export default function Odontogram({ value, onChange, readOnly = false, defaultD
               ))}
             </div>
 
-            {/* Surface box key */}
-            <div className="odont-panel-section odont-surface-key">
-              <div className="odont-panel-label">Surface Boxes</div>
-              <div className="odont-surface-key-body">
-                <SurfaceKey />
-                <div className="odont-surface-key-note">
-                  Centre: occlusal / incisal. Outer edge: buccal. Edge facing the centre: lingual / palatal. M faces the midline.
-                </div>
-              </div>
-            </div>
-
             {/* Selected for this visit */}
             <div className="odont-panel-section">
               <div className="odont-panel-label">Selected Teeth for This Visit:</div>
@@ -427,7 +378,7 @@ export default function Odontogram({ value, onChange, readOnly = false, defaultD
       {/* Popup */}
       {popup && (
         <ToothPopup
-          key={`${popup.toothNumber}-${popup.surface || ""}`}
+          key={popup.toothNumber}
           toothNumber={popup.toothNumber}
           currentCondition={
             conditionMap[popup.toothNumber]?.condition || "HEALTHY"
@@ -435,7 +386,6 @@ export default function Odontogram({ value, onChange, readOnly = false, defaultD
           currentSurfaces={
             conditionMap[popup.toothNumber]?.surfaces || []
           }
-          initialSurface={popup.surface}
           treatedThisVisit={treatedTeeth.has(popup.toothNumber)}
           position={{ x: popup.x, y: popup.y }}
           onApply={handleApply}
