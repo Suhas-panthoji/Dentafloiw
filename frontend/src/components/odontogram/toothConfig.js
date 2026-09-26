@@ -1,4 +1,4 @@
-import { toothKindDetailed } from "./toothPaths";
+import { getToothShape, isAnteriorTooth, isUpperTooth, quadrantOf } from "./toothShapes";
 
 // ─── Conditions ───────────────────────────────────────────────────────
 export const CONDITION_OPTIONS = [
@@ -14,27 +14,34 @@ export const CONDITION_OPTIONS = [
 ];
 
 export const CONDITION_COLORS = {
-  HEALTHY:   "#F5F5F5",
-  CAVITY:    "#C4906A",
-  FILLING:   "#E8E4E0",
-  RCT:       "#8A5AA0",
+  HEALTHY:   "#FFFFFF",
+  CAVITY:    "#6B2F12",
+  FILLING:   "#2563EB",
+  RCT:       "#7E22CE",
   CROWN:     "#D4A843",
-  IMPLANT:   "#2A7A7A",
-  MISSING:   "#968C82",
-  FRACTURED: "#E87040",
-  BRIDGE:    "#5A8ABF",
+  IMPLANT:   "#475569",
+  MISSING:   "#6B7280",
+  FRACTURED: "#F97316",
+  BRIDGE:    "#94A3B8",
 };
 
 export const CONDITION_LEGEND = [
-  { key: "HEALTHY",   label: "Healthy",      swatch: "#F5F5F5",  border: "#C8C0B8" },
-  { key: "CAVITY",    label: "Cavity/Decay",  swatch: "#C4906A",  border: "#A87858" },
-  { key: "FILLING",   label: "Filling",       swatch: "#E8E4E0",  border: "#C8C4C0" },
-  { key: "RCT",       label: "Root Canal",    swatch: "#8A5AA0",  border: "#6E4480" },
-  { key: "CROWN",     label: "Crown",         swatch: "#D4A843",  border: "#B8922E" },
-  { key: "IMPLANT",   label: "Implant",       swatch: "#2A7A7A",  border: "#1E5E5E" },
-  { key: "MISSING",   label: "Missing",       swatch: "#968C82",  border: "#7A7068" },
-  { key: "FRACTURED", label: "Fractured",     swatch: "#E87040",  border: "#C45830" },
+  { key: "HEALTHY",   label: "Healthy",      swatch: "#FFFFFF", border: "#B8AE9F" },
+  { key: "CAVITY",    label: "Cavity/Decay", swatch: "#6B2F12", border: "#4A1F0B" },
+  { key: "FILLING",   label: "Filling",      swatch: "#2563EB", border: "#1E40AF" },
+  { key: "RCT",       label: "Root Canal",   swatch: "#7E22CE", border: "#581C87" },
+  { key: "CROWN",     label: "Crown",        swatch: "#D4A843", border: "#8F6B1E" },
+  { key: "IMPLANT",   label: "Implant",      swatch: "#475569", border: "#1F2937" },
+  { key: "BRIDGE",    label: "Bridge",       swatch: "#94A3B8", border: "#475569" },
+  { key: "FRACTURED", label: "Fractured",    swatch: "#F97316", border: "#C2410C" },
+  { key: "MISSING",   label: "Missing",      swatch: "#FFFFFF", border: "#6B7280", cross: true },
 ];
+
+// Conditions that affect individual surfaces; the rest apply to the whole tooth.
+export const SURFACE_CONDITIONS = new Set(["CAVITY", "FILLING", "FRACTURED"]);
+
+// Conditions that can be the result of treatment done at another clinic.
+export const TREATMENT_CONDITIONS = new Set(["FILLING", "RCT", "CROWN", "IMPLANT", "BRIDGE", "MISSING"]);
 
 // ─── Surface options ──────────────────────────────────────────────────
 export const SURFACE_OPTIONS = [
@@ -45,12 +52,24 @@ export const SURFACE_OPTIONS = [
   { key: "lingual",  label: "L", fullLabel: "Lingual" },
 ];
 
+const SURFACE_KEYS = SURFACE_OPTIONS.map((s) => s.key);
+
+/** Surface name as it applies to this tooth (incisal / labial / palatal). */
+export function surfaceLabel(key, toothNumber) {
+  const anterior = isAnteriorTooth(toothNumber);
+  const upper = isUpperTooth(toothNumber);
+  if (key === "occlusal" && anterior) return { short: "I", full: "Incisal" };
+  if (key === "buccal" && anterior) return { short: "B", full: "Labial" };
+  if (key === "lingual" && upper) return { short: "L", full: "Palatal" };
+  const opt = SURFACE_OPTIONS.find((s) => s.key === key);
+  return { short: opt?.label || key, full: opt?.fullLabel || key };
+}
+
 // ─── Condition aliases (for legacy data) ──────────────────────────────
 const CONDITION_ALIASES = {
   healthy:     "HEALTHY",
   caries:      "CAVITY",
   cavity:      "CAVITY",
-  planned:     "MISSING",
   rct:         "RCT",
   "root-canal": "RCT",
   root_canal:  "RCT",
@@ -115,72 +134,91 @@ export function toothName(number) {
   return TOOTH_NAMES[String(number)] || `Tooth ${number}`;
 }
 
-// ─── Deciduous tooth kind mapping ─────────────────────────────────────
-function deciduousKind(number) {
-  const d = String(number).slice(-1);
-  if (["4", "5"].includes(d)) return "molar";
-  if (d === "3") return "canine";
-  if (d === "2") return "lateralIncisor";
-  return "centralIncisor"; // 1
+// ─── Chart layout ─────────────────────────────────────────────────────
+const CHART_WIDTH = 1280;
+const CHART_SIDE = 64;   // room for the R / L labels
+const TOOTH_GAP = 1.5;
+const BOX_SIZE = 28;
+
+const ARCH_SETS = {
+  permanent: { upper: upperNumbers, lower: lowerNumbers, maxScale: 9 },
+  deciduous: { upper: deciduousUpperNumbers, lower: deciduousLowerNumbers, maxScale: 11 },
+};
+
+/**
+ * Positions every tooth of a dentition ("permanent" | "deciduous").
+ * Teeth sit side by side at their real relative widths; upper crowns hang
+ * down to the occlusal line and lower crowns rise up to meet them.
+ */
+export function buildArchLayout(set) {
+  const def = ARCH_SETS[set];
+  const gaps = (row) => TOOTH_GAP * (row.length - 1);
+  const mmWidth = (row) => row.reduce((w, n) => w + getToothShape(n).W, 0);
+  const avail = CHART_WIDTH - CHART_SIDE * 2;
+  const scale = Math.min(
+    def.maxScale,
+    ...[def.upper, def.lower].map((row) => (avail - gaps(row)) / mmWidth(row))
+  );
+  const rowHeight = (row) =>
+    Math.max(...row.map((n) => {
+      const shape = getToothShape(n);
+      return (shape.H + shape.R) * scale;
+    }));
+
+  const upperNumY = 30;
+  const upperBoxY = upperNumY + 10;
+  const upperTeethTop = upperBoxY + BOX_SIZE + 20;
+  const upperOcclusal = upperTeethTop + rowHeight(def.upper);
+  const lowerOcclusal = upperOcclusal + 10;
+  const lowerTeethBottom = lowerOcclusal + rowHeight(def.lower);
+  const lowerBoxY = lowerTeethBottom + 20;
+  const lowerNumY = lowerBoxY + BOX_SIZE + 20;
+
+  const place = (row, upper) => {
+    let x = (CHART_WIDTH - (mmWidth(row) * scale + gaps(row))) / 2;
+    return row.map((number) => {
+      const shape = getToothShape(number);
+      const width = shape.W * scale;
+      const cx = x + width / 2;
+      x += width + TOOTH_GAP;
+      const boxY = upper ? upperBoxY : lowerBoxY;
+      return {
+        number,
+        row: upper ? "upper" : "lower",
+        shape,
+        scale,
+        x: cx,
+        yOcc: upper ? upperOcclusal : lowerOcclusal,
+        // Patient's left side (right half of the chart) is mirrored so mesial faces the midline.
+        mirror: [2, 3, 6, 7].includes(quadrantOf(number)),
+        anterior: isAnteriorTooth(number),
+        numY: upper ? upperNumY : lowerNumY + 2,
+        box: { x: cx - BOX_SIZE / 2, y: boxY, size: BOX_SIZE },
+        arrow: upper
+          ? { tail: upperBoxY + BOX_SIZE + 3, head: upperTeethTop - 2 }
+          : { tail: lowerBoxY - 3, head: lowerTeethBottom + 2 },
+      };
+    });
+  };
+
+  return {
+    width: CHART_WIDTH,
+    height: lowerNumY + 16,
+    midY: (upperOcclusal + lowerOcclusal) / 2,
+    upper: place(def.upper, true),
+    lower: place(def.lower, false),
+  };
 }
 
-// ─── Layout builders ──────────────────────────────────────────────────
-function buildLayout(numbers, row, labelYOffset, yBase, scaleFactor = 1) {
-  const count = numbers.length;
-  const totalWidth = 1080;
-  const startX = 100;
-  const spacing = totalWidth / count;
-
-  return numbers.map((number, index) => {
-    const isDeciduous = parseInt(number) >= 51;
-    const kind = isDeciduous ? deciduousKind(number) : toothKindDetailed(number);
-    const digit = String(number).slice(-1);
-
-    let scale = scaleFactor;
-    if (!isDeciduous) {
-      if (digit === "8") scale *= 0.92;
-      else if (["6","7"].includes(digit)) scale *= 1.0;
-      else if (["4","5"].includes(digit)) scale *= 0.88;
-      else if (digit === "3") scale *= 0.82;
-      else if (digit === "2") scale *= 0.72;
-      else scale *= 0.76;
-    } else {
-      scale *= 0.7;
-    }
-
-    return {
-      number,
-      row,
-      kind,
-      x: startX + spacing * index + spacing / 2,
-      y: yBase,
-      labelY: labelYOffset,
-      scale,
-    };
-  });
+/** Dentition that shows every tooth already marked, or null for an empty chart. */
+export function inferDentition(records) {
+  const hasDeciduous = records.some((r) => quadrantOf(r.tooth) >= 5);
+  const hasPermanent = records.some((r) => quadrantOf(r.tooth) <= 4);
+  if (hasDeciduous && hasPermanent) return "mixed";
+  if (hasDeciduous) return "deciduous";
+  if (hasPermanent) return "permanent";
+  return null;
 }
-
-export function getPermanentLayout() {
-  return [
-    ...buildLayout(upperNumbers, "upper", 48, 120, 0.88),
-    ...buildLayout(lowerNumbers, "lower", 490, 290, 0.88),
-  ];
-}
-
-export function getDeciduousLayout() {
-  return [
-    ...buildLayout(deciduousUpperNumbers, "upper", 48, 130, 0.85),
-    ...buildLayout(deciduousLowerNumbers, "lower", 480, 280, 0.85),
-  ];
-}
-
-export function getMixedLayout() {
-  // Show permanent teeth but with deciduous overlaid on teeth 1-5 positions
-  return getPermanentLayout();
-}
-
-// Default: permanent
-export const TOOTH_LAYOUT = getPermanentLayout();
 
 // ─── Normalization helpers ────────────────────────────────────────────
 export function normalizeCondition(condition) {
@@ -191,15 +229,22 @@ export function normalizeCondition(condition) {
   return CONDITION_ALIASES[raw.toLowerCase()] || "HEALTHY";
 }
 
-function conditionFromLegacyValue(value) {
-  if (!value) return "HEALTHY";
-  if (typeof value === "string") return normalizeCondition(value);
-  if (typeof value !== "object") return "HEALTHY";
-  if (value.condition) return normalizeCondition(value.condition);
-  const found = Object.values(value).find(
-    (item) => item && normalizeCondition(item) !== "HEALTHY"
-  );
-  return normalizeCondition(found);
+// Old charts stored one condition per surface: { occlusal: "cavity", mesial: "filling" }.
+function fromLegacyValue(value) {
+  if (!value) return { condition: "HEALTHY", surfaces: [] };
+  if (typeof value === "string") return { condition: normalizeCondition(value), surfaces: [] };
+  if (typeof value !== "object") return { condition: "HEALTHY", surfaces: [] };
+  if (value.condition) {
+    return { condition: normalizeCondition(value.condition), surfaces: value.surfaces || [] };
+  }
+  const marked = Object.entries(value)
+    .filter(([key, cond]) => SURFACE_KEYS.includes(key) && normalizeCondition(cond) !== "HEALTHY")
+    .map(([key, cond]) => [key, normalizeCondition(cond)]);
+  if (marked.length === 0) return { condition: "HEALTHY", surfaces: [] };
+  const counts = {};
+  marked.forEach(([, cond]) => { counts[cond] = (counts[cond] || 0) + 1; });
+  const condition = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  return { condition, surfaces: marked.filter(([, cond]) => cond === condition).map(([key]) => key) };
 }
 
 export function normalizeTeethRecords(value) {
@@ -221,8 +266,7 @@ export function normalizeTeethRecords(value) {
     return Object.entries(rawTeeth)
       .map(([tooth, data]) => ({
         tooth: String(tooth),
-        condition: conditionFromLegacyValue(data),
-        surfaces: data?.surfaces || [],
+        ...fromLegacyValue(data),
         treatedThisVisit: data?.treatedThisVisit || false,
         treatedElsewhere: data?.treatedElsewhere || false,
       }))
