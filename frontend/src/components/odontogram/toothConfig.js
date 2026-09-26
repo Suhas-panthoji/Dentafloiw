@@ -136,13 +136,13 @@ export function toothName(number) {
 
 // ─── Chart layout ─────────────────────────────────────────────────────
 const CHART_WIDTH = 1280;
-const CHART_SIDE = 64;   // room for the R / L labels
-const TOOTH_GAP = 1.5;
+const CHART_SIDE = 56;   // room for the R / L labels
 const BOX_SIZE = 28;
+const ARCH_GAP = 44;     // space between the upper and lower teeth
 
 const ARCH_SETS = {
-  permanent: { upper: upperNumbers, lower: lowerNumbers, maxScale: 9 },
-  deciduous: { upper: deciduousUpperNumbers, lower: deciduousLowerNumbers, maxScale: 11 },
+  permanent: { upper: upperNumbers, lower: lowerNumbers, maxScale: 9, toothGap: 10 },
+  deciduous: { upper: deciduousUpperNumbers, lower: deciduousLowerNumbers, maxScale: 11, toothGap: 16 },
 };
 
 /**
@@ -152,7 +152,7 @@ const ARCH_SETS = {
  */
 export function buildArchLayout(set) {
   const def = ARCH_SETS[set];
-  const gaps = (row) => TOOTH_GAP * (row.length - 1);
+  const gaps = (row) => def.toothGap * (row.length - 1);
   const mmWidth = (row) => row.reduce((w, n) => w + getToothShape(n).W, 0);
   const avail = CHART_WIDTH - CHART_SIDE * 2;
   const scale = Math.min(
@@ -169,7 +169,7 @@ export function buildArchLayout(set) {
   const upperBoxY = upperNumY + 10;
   const upperTeethTop = upperBoxY + BOX_SIZE + 20;
   const upperOcclusal = upperTeethTop + rowHeight(def.upper);
-  const lowerOcclusal = upperOcclusal + 10;
+  const lowerOcclusal = upperOcclusal + ARCH_GAP;
   const lowerTeethBottom = lowerOcclusal + rowHeight(def.lower);
   const lowerBoxY = lowerTeethBottom + 20;
   const lowerNumY = lowerBoxY + BOX_SIZE + 20;
@@ -180,7 +180,7 @@ export function buildArchLayout(set) {
       const shape = getToothShape(number);
       const width = shape.W * scale;
       const cx = x + width / 2;
-      x += width + TOOTH_GAP;
+      x += width + def.toothGap;
       const boxY = upper ? upperBoxY : lowerBoxY;
       return {
         number,
@@ -205,6 +205,9 @@ export function buildArchLayout(set) {
     width: CHART_WIDTH,
     height: lowerNumY + 16,
     midY: (upperOcclusal + lowerOcclusal) / 2,
+    midX: CHART_WIDTH / 2,
+    guideTop: upperTeethTop - 6,
+    guideBottom: lowerTeethBottom + 6,
     upper: place(def.upper, true),
     lower: place(def.lower, false),
   };
