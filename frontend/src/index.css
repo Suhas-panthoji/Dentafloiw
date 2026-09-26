@@ -503,6 +503,12 @@ th, td {
   fill: #F7F4EE;
 }
 
+.odont-guide line {
+  stroke: #C9BFB1;
+  stroke-width: 1;
+  stroke-dasharray: 6 5;
+}
+
 /* R/L labels */
 .odont-rl-label {
   font-size: 28px;

@@ -120,6 +120,12 @@ function ArchChart({ set, uid, conditionMap, popupTooth, treatedTeeth, readOnly,
       <ChartDefs uid={uid} />
       <rect x="0" y="0" width={layout.width} height={layout.height} className="odont-chart-bg" rx="12" />
 
+      {/* Guides: bite line between the jaws and the midline between left and right */}
+      <g className="odont-guide" pointerEvents="none">
+        <line x1={layout.upper[0].x - 30} y1={layout.midY} x2={layout.upper[layout.upper.length - 1].x + 30} y2={layout.midY} />
+        <line x1={layout.midX} y1={layout.guideTop} x2={layout.midX} y2={layout.guideBottom} />
+      </g>
+
       <text x="32" y={layout.midY + 9} textAnchor="middle" className="odont-rl-label">R</text>
       <text x={layout.width - 32} y={layout.midY + 9} textAnchor="middle" className="odont-rl-label">L</text>
 
