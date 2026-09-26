@@ -78,6 +78,14 @@ export default function PatientFormPage({ mode }) {
     const a = calcAge(p.general.dob);
     return a !== "" ? `${a} years` : null;
   }, [p.general.dob]);
+  // An empty tooth chart opens on the dentition that fits the patient's age.
+  const defaultDentition = useMemo(() => {
+    const a = calcAge(p.general.dob);
+    if (a === "") return "permanent";
+    if (a < 6) return "deciduous";
+    if (a <= 12) return "mixed";
+    return "permanent";
+  }, [p.general.dob]);
   const consentDocs = useMemo(() => (p.documents || []).filter((d) => d.category === "Consent Form"), [p.documents]);
   const otherDocs = useMemo(() => (p.documents || []).filter((d) => d.category !== "Consent Form"), [p.documents]);
 
@@ -776,11 +784,11 @@ export default function PatientFormPage({ mode }) {
       {/* TAB 7: ODONTOGRAM */}
       {tab === 6 && (
         <div className="space-y-3">
-          <Odontogram value={p.odontogram} onChange={(o) => {
+          <Odontogram value={p.odontogram} defaultDentition={defaultDentition} onChange={(o) => {
             if (!requireSavedGeneral()) return;
             setP((x) => ({ ...x, odontogram: o }));
           }} />
-          <p className="text-[12px] text-[var(--text-2)]">Tip: click surfaces to select, choose a condition and Apply. Save patient to persist changes.</p>
+          <p className="text-[12px] text-[var(--text-2)]">Tip: click a tooth or one of its surface boxes, choose a condition and Apply. Right-click a tooth for quick actions. Save Patient to keep changes.</p>
         </div>
       )}
       </fieldset>

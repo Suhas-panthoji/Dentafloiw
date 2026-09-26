@@ -460,14 +460,31 @@ th, td {
   align-items: flex-start;
 }
 
-/* Chart area */
-.odont-chart-area {
+/* Chart area (one per dentition; two stacked for mixed) */
+.odont-charts {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.odont-chart-area {
   min-width: 0;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-soft);
+  background: #F7F4EE;
+}
+
+.odont-chart-caption {
+  padding: 8px 14px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B6560;
 }
 
 .odont-chart-scroll {
@@ -477,9 +494,13 @@ th, td {
 
 .odont-svg {
   display: block;
-  min-width: 760px;
+  min-width: 880px;
   width: 100%;
   height: auto;
+}
+
+.odont-chart-bg {
+  fill: #F7F4EE;
 }
 
 /* R/L labels */
@@ -493,9 +514,19 @@ th, td {
 /* Tooth numbers */
 .odont-tooth-num {
   font-size: 16px;
-  font-weight: 400;
-  fill: #6B6560;
+  font-weight: 500;
+  fill: #5B534C;
   font-family: 'Inter', sans-serif;
+}
+
+/* Five-surface boxes */
+.odont-surf {
+  cursor: pointer;
+  transition: stroke 120ms ease;
+}
+.odont-surf:hover {
+  stroke: #0D9488;
+  stroke-width: 2;
 }
 
 /* Tooth hover effect */
@@ -562,10 +593,39 @@ th, td {
   flex-shrink: 0;
 }
 
+.odont-legend-swatch.cross {
+  background-image:
+    linear-gradient(45deg, transparent 42%, #3F3F46 42%, #3F3F46 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, #3F3F46 42%, #3F3F46 58%, transparent 58%);
+}
+
 .odont-legend-label {
   font-size: 12px;
   color: var(--text-2);
   font-weight: 500;
+}
+
+.odont-surface-key-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.odont-surface-key-svg {
+  flex-shrink: 0;
+}
+
+.odont-surface-key-text {
+  font-size: 9px;
+  font-weight: 600;
+  fill: #5B4E42;
+  font-family: 'Inter', sans-serif;
+}
+
+.odont-surface-key-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
 }
 
 .odont-panel-section {
@@ -634,8 +694,10 @@ th, td {
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05);
   width: 300px;
+  max-height: calc(100vh - 16px);
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   animation: odont-popup-in 180ms ease-out both;
 }
 
@@ -779,6 +841,25 @@ th, td {
   color: #06161A;
   border-color: var(--teal-dark);
 }
+.odont-popup-surfaces.disabled {
+  opacity: 0.45;
+}
+.odont-popup-surf-btn:disabled {
+  cursor: not-allowed;
+}
+
+.odont-popup-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.odont-popup-question {
+  margin-bottom: 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+}
 
 .odont-popup-actions {
   padding: 10px 14px;
@@ -800,6 +881,14 @@ th, td {
 }
 .odont-popup-apply:hover {
   background: var(--teal-dark);
+}
+.odont-popup-apply.secondary {
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.odont-popup-apply.secondary:hover {
+  background: var(--border);
 }
 
 .odont-popup-treat {
