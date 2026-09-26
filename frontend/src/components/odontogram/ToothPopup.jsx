@@ -11,13 +11,12 @@ import {
 } from "./toothConfig";
 
 /**
- * Popup card that appears when a tooth (or one of its surfaces) is clicked.
+ * Popup card that appears when a tooth is clicked.
  *
  * Props:
  *   toothNumber       – e.g. "36"
  *   currentCondition  – e.g. "HEALTHY"
  *   currentSurfaces   – ["occlusal", ...]
- *   initialSurface    – surface clicked in the surface box, pre-selected
  *   treatedThisVisit  – boolean
  *   position          – { x, y } in page coordinates
  *   onApply           – (toothNumber, condition, surfaces, treatedElsewhere) => void
@@ -29,7 +28,6 @@ export default function ToothPopup({
   toothNumber,
   currentCondition = "HEALTHY",
   currentSurfaces = [],
-  initialSurface = null,
   treatedThisVisit = false,
   position,
   onApply,
@@ -38,9 +36,7 @@ export default function ToothPopup({
   readOnly = false,
 }) {
   const [condition, setCondition] = useState(currentCondition);
-  const [surfaces, setSurfaces] = useState(
-    () => new Set([...currentSurfaces, ...(initialSurface ? [initialSurface] : [])])
-  );
+  const [surfaces, setSurfaces] = useState(() => new Set(currentSurfaces));
   const [askingTreated, setAskingTreated] = useState(false);
   const ref = useRef(null);
   const usesSurfaces = SURFACE_CONDITIONS.has(condition);

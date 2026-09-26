@@ -137,7 +137,6 @@ export function toothName(number) {
 // ─── Chart layout ─────────────────────────────────────────────────────
 const CHART_WIDTH = 1280;
 const CHART_SIDE = 56;   // room for the R / L labels
-const BOX_SIZE = 28;
 const ARCH_GAP = 44;     // space between the upper and lower teeth
 
 const ARCH_SETS = {
@@ -166,13 +165,11 @@ export function buildArchLayout(set) {
     }));
 
   const upperNumY = 30;
-  const upperBoxY = upperNumY + 10;
-  const upperTeethTop = upperBoxY + BOX_SIZE + 20;
+  const upperTeethTop = upperNumY + 30;
   const upperOcclusal = upperTeethTop + rowHeight(def.upper);
   const lowerOcclusal = upperOcclusal + ARCH_GAP;
   const lowerTeethBottom = lowerOcclusal + rowHeight(def.lower);
-  const lowerBoxY = lowerTeethBottom + 20;
-  const lowerNumY = lowerBoxY + BOX_SIZE + 20;
+  const lowerNumY = lowerTeethBottom + 42;
 
   const place = (row, upper) => {
     let x = (CHART_WIDTH - (mmWidth(row) * scale + gaps(row))) / 2;
@@ -181,7 +178,6 @@ export function buildArchLayout(set) {
       const width = shape.W * scale;
       const cx = x + width / 2;
       x += width + def.toothGap;
-      const boxY = upper ? upperBoxY : lowerBoxY;
       return {
         number,
         row: upper ? "upper" : "lower",
@@ -192,11 +188,11 @@ export function buildArchLayout(set) {
         // Patient's left side (right half of the chart) is mirrored so mesial faces the midline.
         mirror: [2, 3, 6, 7].includes(quadrantOf(number)),
         anterior: isAnteriorTooth(number),
-        numY: upper ? upperNumY : lowerNumY + 2,
-        box: { x: cx - BOX_SIZE / 2, y: boxY, size: BOX_SIZE },
+        numY: upper ? upperNumY : lowerNumY,
+        // "Treated elsewhere" arrow sits between the tooth number and the tooth.
         arrow: upper
-          ? { tail: upperBoxY + BOX_SIZE + 3, head: upperTeethTop - 2 }
-          : { tail: lowerBoxY - 3, head: lowerTeethBottom + 2 },
+          ? { tail: upperNumY + 6, head: upperTeethTop - 2 }
+          : { tail: lowerNumY - 18, head: lowerTeethBottom + 2 },
       };
     });
   };
