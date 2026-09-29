@@ -18,7 +18,7 @@ import bcrypt
 import jwt
 import certifi
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Literal
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -107,8 +107,13 @@ async def get_current_user(
     return user
 
 def require_doctor(user=Depends(get_current_user)):
-    if user.get("role") != "doctor":
-        raise HTTPException(403, "Doctor access required")
+    if user.get("role") not in {"doctor", "admin"}:
+        raise HTTPException(403, "Doctor or administrator access required")
+    return user
+
+def require_admin(user=Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Administrator access required")
     return user
 
 def now_iso() -> str:
@@ -124,6 +129,19 @@ class UserOut(BaseModel):
     email: str
     name: str
     role: str
+
+class ManagedUserIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    role: Literal["doctor", "staff", "admin"]
+    password: str = Field(min_length=8, max_length=128)
+
+class ManagedUserUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None
+    role: Optional[Literal["doctor", "staff", "admin"]] = None
+    # Passwords are write-only and are never returned by the API.
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
 
 class LoginOut(BaseModel):
     token: str
@@ -187,6 +205,52 @@ async def active_sessions(user=Depends(require_doctor)):
         {"last_seen": {"$gte": cutoff}}, {"_id": 0, "token": 0}
     ).to_list(100)
     return sessions
+
+# ─── Administrator account management ──────────────────────────────────────
+@api.get("/admin/users")
+async def list_users(user=Depends(require_admin)):
+    """Return account metadata only; password hashes are intentionally excluded."""
+    return await db.users.find(
+        {}, {"_id": 0, "password_hash": 0}
+    ).sort("created_at", 1).to_list(1000)
+
+@api.post("/admin/users", response_model=UserOut, status_code=201)
+async def create_user(body: ManagedUserIn, user=Depends(require_admin)):
+    email = str(body.email).lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, "An account with this email already exists")
+    account = {
+        "id": str(uuid.uuid4()), "name": body.name.strip(), "email": email,
+        "role": body.role, "password_hash": hash_pw(body.password),
+        "created_at": now_iso(), "created_by": user["email"],
+    }
+    await db.users.insert_one(account)
+    return {key: account[key] for key in ("id", "name", "email", "role")}
+
+@api.put("/admin/users/{uid}", response_model=UserOut)
+async def update_user(uid: str, body: ManagedUserUpdate, user=Depends(require_admin)):
+    existing = await db.users.find_one({"id": uid})
+    if not existing:
+        raise HTTPException(404, "Account not found")
+    changes = body.model_dump(exclude_none=True)
+    if "email" in changes:
+        changes["email"] = str(changes["email"]).lower().strip()
+        duplicate = await db.users.find_one({"email": changes["email"], "id": {"$ne": uid}})
+        if duplicate:
+            raise HTTPException(409, "An account with this email already exists")
+    if "name" in changes:
+        changes["name"] = changes["name"].strip()
+    if "password" in changes:
+        changes["password_hash"] = hash_pw(changes.pop("password"))
+    if not changes:
+        raise HTTPException(400, "No account changes supplied")
+    changes["updated_at"] = now_iso()
+    await db.users.update_one({"id": uid}, {"$set": changes})
+    # A password or role change invalidates all existing sessions for this account.
+    if "password_hash" in changes or "role" in changes:
+        await db.sessions.delete_many({"user_id": uid})
+    updated = await db.users.find_one({"id": uid}, {"_id": 0, "password_hash": 0})
+    return updated
 
 # ─── Patients ───────────────────────────────────────────────────────────────
 @api.post("/patients")
@@ -596,8 +660,6 @@ async def seed_user(email: str, password: str, name: str, role: str):
         })
     else:
         update_fields = {"name": name, "role": role}
-        if not verify_pw(password, existing["password_hash"]):
-            update_fields["password_hash"] = hash_pw(password)
         await db.users.update_one(
             {"email": email}, {"$set": update_fields}
         )
@@ -607,6 +669,7 @@ async def seed():
     await db.patients.create_index("id", unique=True)
     await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Naveen Shamanur", "doctor")
     await seed_user(os.environ["STAFF_EMAIL"], os.environ["STAFF_PASSWORD"], "Kavita Reddy", "staff")
+    await seed_user(os.environ["ADMIN_EMAIL"], os.environ["ADMIN_PASSWORD"], "Clinic Administrator", "admin")
     if await db.treatments.count_documents({}) == 0:
         for t in DEMO_TREATMENTS:
             await db.treatments.insert_one({"id": str(uuid.uuid4()), "created_at": now_iso(), **t})

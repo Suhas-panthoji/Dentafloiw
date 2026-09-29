@@ -31,7 +31,12 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, logout, isDoctor: user?.role === "doctor" }}>
+    <AuthCtx.Provider value={{
+      user, loading, login, logout,
+      // Administrators have all doctor-level clinic permissions.
+      isDoctor: ["doctor", "admin"].includes(user?.role),
+      isAdmin: user?.role === "admin",
+    }}>
       {children}
     </AuthCtx.Provider>
   );

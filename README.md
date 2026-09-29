@@ -26,7 +26,11 @@ Make sure your environment variables are configured on the Hugging Face Space se
 - `DOCTOR_PASSWORD`: Default doctor login password
 - `STAFF_EMAIL`: Default staff login email
 - `STAFF_PASSWORD`: Default staff login password
+- `ADMIN_EMAIL`: Initial administrator login email
+- `ADMIN_PASSWORD`: Initial administrator password
 - `CLOUDINARY_CLOUD_NAME`: `girjx2b4`
 - `CLOUDINARY_API_KEY`: `785154621536711`
 - `CLOUDINARY_API_SECRET`: `IWUSx1DA2LgQdIPREcpKb84wXl0`
 - `CORS_ORIGINS`: `*`
+
+The administrator has doctor-level clinic access and can manage user accounts at **Accounts**. Accounts, roles, and password changes are stored securely in MongoDB; passwords are never displayed and environment secrets are not modified through the web app.

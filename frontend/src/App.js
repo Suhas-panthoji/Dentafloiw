@@ -13,6 +13,7 @@ import FinancesPage from "@/pages/FinancesPage";
 import PriceCatalogPage from "@/pages/PriceCatalogPage";
 import FollowUpsPage from "@/pages/FollowUpsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import AccountManagementPage from "@/pages/AccountManagementPage";
 import "@/App.css";
 
 const getInitialTheme = () => {
@@ -24,13 +25,14 @@ const getInitialTheme = () => {
   }
 };
 
-function Protected({ children, doctorOnly = false }) {
-  const { user, loading, isDoctor } = useAuth();
+function Protected({ children, doctorOnly = false, adminOnly = false }) {
+  const { user, loading, isDoctor, isAdmin } = useAuth();
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-[var(--text-2)]">Loading…</div>;
   }
   if (!user) return <Navigate to="/login" replace />;
   if (doctorOnly && !isDoctor) return <Navigate to="/" replace />;
+  if (adminOnly && !isAdmin) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -65,6 +67,7 @@ function App() {
             <Route path="catalog" element={<Protected doctorOnly><PriceCatalogPage /></Protected>} />
             <Route path="followups" element={<FollowUpsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="accounts" element={<Protected adminOnly><AccountManagementPage /></Protected>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

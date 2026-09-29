@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import {
-  LayoutDashboard, Users, Wallet, Tags, CalendarClock, Settings, LogOut, Menu, Moon, Sun, X,
+  LayoutDashboard, Users, Wallet, Tags, CalendarClock, Settings, UserCog, LogOut, Menu, Moon, Sun, X,
 } from "lucide-react";
 
 function ToothLogo({ size = 22 }) {
@@ -21,10 +21,11 @@ const NAV = [
   { to: "/catalog",   label: "Price Catalog", icon: Tags, doctorOnly: true },
   { to: "/followups", label: "Follow-ups",    icon: CalendarClock },
   { to: "/settings",  label: "Settings",      icon: Settings },
+  { to: "/accounts",  label: "Accounts",      icon: UserCog, adminOnly: true },
 ];
 
 export default function Layout({ theme = "dark", onToggleTheme }) {
-  const { user, logout, isDoctor } = useAuth();
+  const { user, logout, isDoctor, isAdmin } = useAuth();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const isDark = theme === "dark";
@@ -41,7 +42,7 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
           </div>
         </div>
         <nav className="py-3 flex-1">
-          {NAV.filter((n) => !n.doctorOnly || isDoctor).map((n) => {
+          {NAV.filter((n) => (!n.doctorOnly || isDoctor) && (!n.adminOnly || isAdmin)).map((n) => {
             const Icon = n.icon;
             return (
               <NavLink
@@ -88,7 +89,7 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
               <div className="text-[11px] text-[var(--text-2)]">{user?.email}</div>
             </div>
             <span className={`df-badge ${isDoctor ? "df-badge-teal" : "df-badge-grey"}`} data-testid="role-badge">
-              {isDoctor ? "Doctor" : "Staff"}
+              {isAdmin ? "Admin" : isDoctor ? "Doctor" : "Staff"}
             </span>
             <button
               className="df-btn df-btn-ghost df-logout"
