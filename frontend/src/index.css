@@ -233,7 +233,8 @@ textarea.df-input { resize: vertical; min-height: 76px; font-family: inherit; }
   border-right: 1px solid rgba(255,255,255,0.06);
   transition: transform 180ms ease;
 }
-.df-sidebar a {
+.df-sidebar a,
+.df-sidebar-nav-button {
   color: rgba(255,255,255,0.78);
   display: flex; align-items: center; gap: 12px;
   padding: 11px 18px;
@@ -241,8 +242,17 @@ textarea.df-input { resize: vertical; min-height: 76px; font-family: inherit; }
   border-left: 3px solid transparent;
   transition: background-color 150ms ease, color 150ms ease;
   text-decoration: none;
+  width: 100%;
+  background: transparent;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
 }
-.df-sidebar a:hover { background: rgba(255,255,255,0.10); color: #fff; }
+.df-sidebar a:hover,
+.df-sidebar-nav-button:hover { background: rgba(255,255,255,0.10); color: #fff; }
 .df-sidebar a.active {
   background: rgba(255,255,255,0.15);
   color: #fff;

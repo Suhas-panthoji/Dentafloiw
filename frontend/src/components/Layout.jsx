@@ -57,6 +57,14 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
               </NavLink>
             );
           })}
+          {isAdmin && <button
+            type="button"
+            className="df-sidebar-nav-button"
+            onClick={() => { setResourceUsageOpen(true); setOpen(false); }}
+            data-testid="resource-usage-btn"
+          >
+            <Gauge size={18} /> <span>Resource Usage</span>
+          </button>}
         </nav>
         <div className="p-4 border-t border-white/10 text-[12px] text-white/70">
           v1.0 · {new Date().getFullYear()}
@@ -76,14 +84,6 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
             </div>
           </div>
           <div className="df-header-user flex items-center gap-3 min-w-0" data-testid="header-user">
-            {isAdmin && <button
-              type="button"
-              className="df-btn df-btn-ghost"
-              onClick={() => setResourceUsageOpen(true)}
-              data-testid="resource-usage-btn"
-            >
-              <Gauge size={16} /> <span className="hidden sm:inline">Resource Usage</span>
-            </button>}
             <button
               type="button"
               className="df-btn df-btn-ghost df-theme-toggle"
