@@ -1,0 +1,23 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. CREATE DATASET
+
+data = {
+    'customer_id' : [101,102,103,104,105,106,107,109,110,103],
+    'name' : ['Rahul', 'Priya', 'Amit', 'Sneha', 'Arun','Kiran', 'Meena','Ravi', 'Anita', 'Vijay', 'Amit'],
+     'age' : [25, 30, np.nan, 28, 150, 35, 29, np.nan, 42, 31, 28],
+    'gender' : ['Male', 'Female', 'M', 'Female', 'Male','F', 'Female', 'Male', 'female', 'Male', 'M'],
+    'city' : ['Bangalore', 'Bengaluru', 'Mysore', 'Mysore', 'Hubli',
+            'Bangalore', 'Bengaluru', 'Mysore', 'Mysuru', 'Hubli', 'Mysore'],
+    'income' : [45000, 55000, 40000, 60000, 50000,
+                48000, 52000, 47000, 1000000, np.nan, 40000],
+
+    'purchased' : ['Yes', 'No', 'Yes', 'Yes', 'No',
+                   'Yes', 'No', 'Yes', 'No', 'Yes', 'Yes']
+      }
+
+df = pd.DataFrame(data)
+

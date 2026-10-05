@@ -1,7 +1,10 @@
 from dotenv import load_dotenv
 from pathlib import Path
 import asyncio
+import json
+import time
 import urllib.request
+import urllib.parse
 import sys
 
 ROOT_DIR = Path(__file__).parent
@@ -20,13 +23,14 @@ import certifi
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict, Literal
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 import cloudinary
 import cloudinary.uploader
+import cloudinary.api
 
 # ─── Setup ──────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +66,11 @@ else:
 app = FastAPI(title="DentaFlow API")
 api = APIRouter(prefix="/api")
 bearer_scheme = HTTPBearer(auto_error=False)
+
+# The endpoint cache prevents dashboard refreshes from repeatedly querying providers.
+USAGE_CACHE_TTL_SECONDS = 300
+USAGE_REFRESH_COOLDOWN_SECONDS = 30
+usage_cache = {"value": None, "expires_at": 0.0, "last_refresh_at": 0.0}
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 def hash_pw(p: str) -> str:
@@ -118,6 +127,77 @@ def require_admin(user=Depends(get_current_user)):
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+def usage_month_start() -> datetime:
+    now = datetime.now(timezone.utc)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+def usage_month_key() -> str:
+    return usage_month_start().strftime("%Y-%m")
+
+def estimated_render_hours() -> float:
+    """Free-instance hours cannot be retrieved from Render's public API."""
+    return round((datetime.now(timezone.utc) - usage_month_start()).total_seconds() / 3600, 2)
+
+def render_bandwidth_from_api() -> float:
+    api_key = os.environ.get("RENDER_API_KEY")
+    service_id = os.environ.get("RENDER_SERVICE_ID")
+    if not api_key or not service_id:
+        raise RuntimeError("Render API credentials are not configured")
+
+    query = urllib.parse.urlencode({
+        "resource": service_id,
+        "startTime": usage_month_start().isoformat().replace("+00:00", "Z"),
+        "endTime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    })
+    request = urllib.request.Request(
+        f"https://api.render.com/v1/metrics/bandwidth?{query}",
+        headers={"Accept": "application/json", "Authorization": f"Bearer {api_key}"},
+    )
+    with urllib.request.urlopen(request, timeout=8) as response:
+        series = json.loads(response.read().decode("utf-8"))
+    return round(sum(
+        point.get("value", 0) for item in series for point in item.get("values", [])
+        if item.get("values") and point.get("unit", "GB") == "GB"
+    ), 4)
+
+def cloudinary_storage_usage() -> float:
+    if not all((cloudinary_cloud, cloudinary_key, cloudinary_secret)):
+        raise RuntimeError("Cloudinary credentials are not configured")
+    usage = cloudinary.api.usage()
+    storage_bytes = usage.get("storage", {}).get("usage")
+    if storage_bytes is None:
+        raise RuntimeError("Cloudinary did not return storage usage")
+    return round(storage_bytes / (1024 ** 3), 6)
+
+async def build_usage_snapshot() -> Dict[str, Any]:
+    render = {"status": "estimated", "running_hours": estimated_render_hours(), "bandwidth_gb": 0, "message": "Running hours are estimated from the start of this month."}
+    try:
+        render["bandwidth_gb"] = await asyncio.wait_for(asyncio.to_thread(render_bandwidth_from_api), timeout=10)
+        render["message"] = "Running hours are estimated; bandwidth is from the Render service metrics API."
+    except Exception:
+        try:
+            counter = await asyncio.wait_for(db.usage_counters.find_one({"month": usage_month_key()}), timeout=8)
+            render["bandwidth_gb"] = round((counter or {}).get("response_bytes", 0) / (1024 ** 3), 6)
+            render["message"] = "Running hours and bandwidth are estimates; bandwidth counts this app's HTTP response bodies."
+        except Exception:
+            render["message"] = "Running hours are estimated; bandwidth data is temporarily unavailable."
+
+    cloudinary_usage = {"status": "ok", "storage_gb": 0, "message": ""}
+    try:
+        cloudinary_usage["storage_gb"] = await asyncio.wait_for(asyncio.to_thread(cloudinary_storage_usage), timeout=10)
+        cloudinary_usage["message"] = "Storage is from the Cloudinary usage API."
+    except Exception:
+        cloudinary_usage = {"status": "error", "storage_gb": None, "message": "Cloudinary storage could not be read."}
+
+    mongo = {"status": "ok", "storage_mb": 0, "message": ""}
+    try:
+        stats = await asyncio.wait_for(db.command("dbStats"), timeout=8)
+        mongo["storage_mb"] = round((stats.get("storageSize", 0) + stats.get("indexSize", 0)) / (1024 ** 2), 4)
+    except Exception:
+        mongo = {"status": "error", "storage_mb": None, "message": "MongoDB storage could not be read."}
+
+    return {"updated_at": now_iso(), "render": render, "cloudinary": cloudinary_usage, "mongo": mongo}
 
 # ─── Models ─────────────────────────────────────────────────────────────────
 class LoginIn(BaseModel):
@@ -214,6 +294,21 @@ async def list_users(user=Depends(require_admin)):
         {}, {"_id": 0, "password_hash": 0}
     ).sort("created_at", 1).to_list(1000)
 
+@api.get("/admin/usage")
+async def admin_usage(refresh: bool = False, user=Depends(require_admin)):
+    """Return cached, server-side infrastructure usage; credentials never leave the API."""
+    now = time.monotonic()
+    if refresh and now - usage_cache["last_refresh_at"] < USAGE_REFRESH_COOLDOWN_SECONDS:
+        raise HTTPException(429, "Please wait before refreshing usage again")
+    if not refresh and usage_cache["value"] and now < usage_cache["expires_at"]:
+        return usage_cache["value"]
+
+    if refresh:
+        usage_cache["last_refresh_at"] = now
+    snapshot = await build_usage_snapshot()
+    usage_cache.update({"value": snapshot, "expires_at": time.monotonic() + USAGE_CACHE_TTL_SECONDS})
+    return snapshot
+
 @api.post("/admin/users", response_model=UserOut, status_code=201)
 async def create_user(body: ManagedUserIn, user=Depends(require_admin)):
     email = str(body.email).lower().strip()
@@ -225,7 +320,21 @@ async def create_user(body: ManagedUserIn, user=Depends(require_admin)):
         "created_at": now_iso(), "created_by": user["email"],
     }
     await db.users.insert_one(account)
+    await db.password_history.insert_one({
+        "id": str(uuid.uuid4()), "user_id": account["id"],
+        "event": "Password set when account was created", "changed_at": account["created_at"],
+        "changed_by": user["email"],
+    })
     return {key: account[key] for key in ("id", "name", "email", "role")}
+
+@api.get("/admin/users/{uid}/password-history")
+async def password_history(uid: str, user=Depends(require_admin)):
+    """Return password audit metadata; passwords and hashes are never exposed."""
+    if not await db.users.find_one({"id": uid}, {"_id": 1}):
+        raise HTTPException(404, "Account not found")
+    return await db.password_history.find(
+        {"user_id": uid}, {"_id": 0, "password_hash": 0}
+    ).sort("changed_at", -1).to_list(100)
 
 @api.put("/admin/users/{uid}", response_model=UserOut)
 async def update_user(uid: str, body: ManagedUserUpdate, user=Depends(require_admin)):
@@ -240,12 +349,18 @@ async def update_user(uid: str, body: ManagedUserUpdate, user=Depends(require_ad
             raise HTTPException(409, "An account with this email already exists")
     if "name" in changes:
         changes["name"] = changes["name"].strip()
-    if "password" in changes:
+    password_changed = "password" in changes
+    if password_changed:
         changes["password_hash"] = hash_pw(changes.pop("password"))
     if not changes:
         raise HTTPException(400, "No account changes supplied")
     changes["updated_at"] = now_iso()
     await db.users.update_one({"id": uid}, {"$set": changes})
+    if password_changed:
+        await db.password_history.insert_one({
+            "id": str(uuid.uuid4()), "user_id": uid, "event": "Password changed",
+            "changed_at": changes["updated_at"], "changed_by": user["email"],
+        })
     # A password or role change invalidates all existing sessions for this account.
     if "password_hash" in changes or "role" in changes:
         await db.sessions.delete_many({"user_id": uid})
@@ -666,10 +781,22 @@ async def seed_user(email: str, password: str, name: str, role: str):
 
 async def seed():
     await db.users.create_index("email", unique=True)
+    await db.password_history.create_index([("user_id", 1), ("changed_at", -1)])
+    await db.usage_counters.create_index("month", unique=True)
     await db.patients.create_index("id", unique=True)
-    await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Naveen Shamanur", "doctor")
-    await seed_user(os.environ["STAFF_EMAIL"], os.environ["STAFF_PASSWORD"], "Kavita Reddy", "staff")
-    await seed_user(os.environ["ADMIN_EMAIL"], os.environ["ADMIN_PASSWORD"], "Clinic Administrator", "admin")
+    doctor_email = os.environ.get("DOCTOR_EMAIL", "naveens2005@gmail.com")
+    doctor_pass = os.environ.get("DOCTOR_PASSWORD", "ssdentalcare@dvg")
+    staff_email = os.environ.get("STAFF_EMAIL", "staffssdentalcare@gmail.com")
+    staff_pass = os.environ.get("STAFF_PASSWORD", "staff@123")
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@dentaflow.com")
+    admin_pass = os.environ.get("ADMIN_PASSWORD", "AdminPass123!")
+
+    if doctor_email and doctor_pass:
+        await seed_user(doctor_email, doctor_pass, "Dr. Naveen Shamanur", "doctor")
+    if staff_email and staff_pass:
+        await seed_user(staff_email, staff_pass, "Kavita Reddy", "staff")
+    if admin_email and admin_pass:
+        await seed_user(admin_email, admin_pass, "Clinic Administrator", "admin")
     if await db.treatments.count_documents({}) == 0:
         for t in DEMO_TREATMENTS:
             await db.treatments.insert_one({"id": str(uuid.uuid4()), "created_at": now_iso(), **t})
@@ -753,6 +880,25 @@ async def shutdown():
     client.close()
 
 app.include_router(api)
+
+@app.middleware("http")
+async def count_monthly_response_bytes(request: Request, call_next):
+    """Track outgoing response bodies when Render's metrics API is unavailable."""
+    response = await call_next(request)
+    content_length = response.headers.get("content-length")
+    if request.url.path != "/api/admin/usage" and content_length:
+        try:
+            byte_count = max(0, int(content_length))
+            if byte_count:
+                await db.usage_counters.update_one(
+                    {"month": usage_month_key()},
+                    {"$inc": {"response_bytes": byte_count}, "$set": {"updated_at": now_iso()}},
+                    upsert=True,
+                )
+        except Exception:
+            logger.warning("Unable to update monthly response-byte usage counter")
+    return response
+
 cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
 cors_origins = [o.strip() for o in cors_origins if o.strip()]
 

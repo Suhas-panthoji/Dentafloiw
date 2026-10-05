@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import {
-  LayoutDashboard, Users, Wallet, Tags, CalendarClock, Settings, UserCog, LogOut, Menu, Moon, Sun, X,
+  Gauge, LayoutDashboard, Users, Wallet, Tags, CalendarClock, Settings, UserCog, LogOut, Menu, Moon, Sun, X,
 } from "lucide-react";
+import ResourceUsageModal from "@/components/ResourceUsageModal";
 
 function ToothLogo({ size = 22 }) {
   return (
@@ -28,6 +29,7 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
   const { user, logout, isDoctor, isAdmin } = useAuth();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
+  const [resourceUsageOpen, setResourceUsageOpen] = useState(false);
   const isDark = theme === "dark";
 
   return (
@@ -74,6 +76,14 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
             </div>
           </div>
           <div className="df-header-user flex items-center gap-3 min-w-0" data-testid="header-user">
+            {isAdmin && <button
+              type="button"
+              className="df-btn df-btn-ghost"
+              onClick={() => setResourceUsageOpen(true)}
+              data-testid="resource-usage-btn"
+            >
+              <Gauge size={16} /> <span className="hidden sm:inline">Resource Usage</span>
+            </button>}
             <button
               type="button"
               className="df-btn df-btn-ghost df-theme-toggle"
@@ -104,6 +114,7 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
           <Outlet />
         </main>
       </div>
+      {resourceUsageOpen && <ResourceUsageModal onClose={() => setResourceUsageOpen(false)} />}
     </div>
   );
 }
