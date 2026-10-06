@@ -92,3 +92,10 @@ memory/test_credentials.md
 # Mobile development
 android-sdk/frontend/node_modules/.cache/default-development/2.pack
 frontend/node_modules/.cache/default-development/1.pack
+
+# Migration backups and temporary data
+backend/db_backup/
+backend/log/
+*.lock
+migration_map.jsonl
+verify_report.json
