@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from pathlib import Path
 import asyncio
+import io
 import json
 import time
 import urllib.request
@@ -22,15 +23,14 @@ import jwt
 import certifi
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict, Literal
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
+from storage import make_storage, StorageConfigurationError
+from image_pipeline import prepare_upload, UploadValidationError
 
 # ─── Setup ──────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -47,21 +47,6 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
 ACCESS_TTL_HOURS = 24
 
-# Configure Cloudinary
-cloudinary_cloud = os.environ.get("CLOUDINARY_CLOUD_NAME")
-cloudinary_key = os.environ.get("CLOUDINARY_API_KEY")
-cloudinary_secret = os.environ.get("CLOUDINARY_API_SECRET")
-
-if (not cloudinary_cloud or not cloudinary_key or not cloudinary_secret or
-    "<your_api_key>" in cloudinary_key or "your_api_key" in cloudinary_key):
-    logger.warning("Cloudinary credentials are not fully configured in backend/.env. Uploads will fail until you configure them.")
-else:
-    cloudinary.config(
-        cloud_name=cloudinary_cloud,
-        api_key=cloudinary_key,
-        api_secret=cloudinary_secret,
-        secure=True
-    )
 
 app = FastAPI(title="DentaFlow API")
 api = APIRouter(prefix="/api")
@@ -128,6 +113,36 @@ def require_admin(user=Depends(get_current_user)):
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+def storage_entries(value):
+    """Yield new R2 metadata records from a patient document recursively."""
+    if isinstance(value, dict):
+        if value.get("storage") == "r2" and value.get("key"):
+            yield value
+        else:
+            for item in value.values():
+                yield from storage_entries(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from storage_entries(item)
+
+def delete_storage_entries(value):
+    try:
+        storage = make_storage()
+        for record in storage_entries(value):
+            for key in (record.get("key"), record.get("thumb_key"), record.get("display_key")):
+                storage.delete_file(key)
+    except Exception:
+        logger.exception("Unable to remove private patient objects")
+
+def object_extension(content_type: str) -> str:
+    return {"image/webp": "webp", "image/png": "png", "image/jpeg": "jpg", "application/pdf": "pdf", "application/dicom": "dcm"}.get(content_type, "bin")
+
+def find_patient_file(patient: Dict[str, Any], file_id: str):
+    for record in storage_entries(patient):
+        if record.get("id") == file_id:
+            return record
+    return None
+
 def usage_month_start() -> datetime:
     now = datetime.now(timezone.utc)
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -161,15 +176,6 @@ def render_bandwidth_from_api() -> float:
         if item.get("values") and point.get("unit", "GB") == "GB"
     ), 4)
 
-def cloudinary_storage_usage() -> float:
-    if not all((cloudinary_cloud, cloudinary_key, cloudinary_secret)):
-        raise RuntimeError("Cloudinary credentials are not configured")
-    usage = cloudinary.api.usage()
-    storage_bytes = usage.get("storage", {}).get("usage")
-    if storage_bytes is None:
-        raise RuntimeError("Cloudinary did not return storage usage")
-    return round(storage_bytes / (1024 ** 3), 6)
-
 async def build_usage_snapshot() -> Dict[str, Any]:
     render = {"status": "estimated", "running_hours": estimated_render_hours(), "bandwidth_gb": 0, "message": "Running hours are estimated from the start of this month."}
     try:
@@ -183,12 +189,7 @@ async def build_usage_snapshot() -> Dict[str, Any]:
         except Exception:
             render["message"] = "Running hours are estimated; bandwidth data is temporarily unavailable."
 
-    cloudinary_usage = {"status": "ok", "storage_gb": 0, "message": ""}
-    try:
-        cloudinary_usage["storage_gb"] = await asyncio.wait_for(asyncio.to_thread(cloudinary_storage_usage), timeout=10)
-        cloudinary_usage["message"] = "Storage is from the Cloudinary usage API."
-    except Exception:
-        cloudinary_usage = {"status": "error", "storage_gb": None, "message": "Cloudinary storage could not be read."}
+    cloudinary_usage = {"status": "not_available", "storage_gb": None, "message": "R2 does not provide a storage-usage API in this application."}
 
     mongo = {"status": "ok", "storage_mb": 0, "message": ""}
     try:
@@ -231,8 +232,8 @@ class PatientIn(BaseModel):
     general: Dict[str, Any] = Field(default_factory=dict)
     medical: Dict[str, Any] = Field(default_factory=dict)
     oral_exam: Dict[str, Any] = Field(default_factory=dict)
-    photo: Optional[str] = None  # base64
-    signature: Optional[str] = None
+    photo: Optional[Any] = None  # legacy URL or private storage metadata
+    signature: Optional[Any] = None
     odontogram: Dict[str, Any] = Field(default_factory=dict)
     visits: List[Dict[str, Any]] = Field(default_factory=list)
     clinical_photos: List[Dict[str, Any]] = Field(default_factory=list)
@@ -405,61 +406,87 @@ async def update_patient(pid: str, body: PatientIn, user=Depends(get_current_use
     update = body.model_dump()
     update["updated_at"] = now_iso()
     await db.patients.update_one({"id": pid}, {"$set": update})
+    retained_keys = {item.get("key") for item in storage_entries(update)}
+    for item in storage_entries(existing):
+        if item.get("key") not in retained_keys:
+            await asyncio.to_thread(delete_storage_entries, item)
     p = await db.patients.find_one({"id": pid}, {"_id": 0})
     return p
 
 @api.delete("/patients/{pid}")
 async def delete_patient(pid: str, user=Depends(require_doctor)):
-    res = await db.patients.delete_one({"id": pid})
-    if res.deleted_count == 0:
+    patient = await db.patients.find_one({"id": pid}, {"_id": 0})
+    if not patient:
         raise HTTPException(404, "Patient not found")
+    res = await db.patients.delete_one({"id": pid})
+    await asyncio.to_thread(delete_storage_entries, patient)
     return {"ok": True}
 
 # ─── File Uploads (Cloudinary) ──────────────────────────────────────────────
 @api.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
+    patient_id: str = Form(...),
+    kind: str = Form("documents"),
     user=Depends(get_current_user)
 ):
     try:
-        # Check if configured
-        if not cloudinary.config().cloud_name:
-            raise HTTPException(status_code=500, detail="Cloudinary is not configured in backend/.env")
-        
-        # Upload using the file.file stream
-        upload_result = cloudinary.uploader.upload(
-            file.file,
-            folder="dentaflow",
-            resource_type="auto"
-        )
-        return {
-            "url": upload_result.get("secure_url"),
-            "public_id": upload_result.get("public_id"),
-            "type": file.content_type or upload_result.get("resource_type")
-        }
-    except Exception as e:
-        logger.error(f"Cloudinary upload error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload to Cloudinary: {str(e)}")
+        if kind not in {"photo", "signature", "clinical_photos", "radiographs", "documents"}:
+            raise HTTPException(400, "Invalid upload kind")
+        if not await db.patients.find_one({"id": patient_id}, {"_id": 1}):
+            raise HTTPException(404, "Patient not found")
+        prepared = await asyncio.to_thread(prepare_upload, file.file, file.content_type, kind)
+        storage = make_storage()
+        file_id = str(uuid.uuid4())
+        extension = object_extension(prepared["original_type"])
+        base = f"patients/{patient_id}/{kind}/{file_id}"
+        key = f"{base}.{extension}"
+        await asyncio.to_thread(storage.upload_file, io.BytesIO(prepared["original"]), key, prepared["original_type"])
+        record = {"id": file_id, "storage": "r2", "key": key, "content_type": prepared["original_type"], "bytes": len(prepared["original"])}
+        if prepared["thumb"] is not None:
+            record["thumb_key"] = f"{base}_thumb.webp"
+            record["display_key"] = f"{base}_display.webp"
+            await asyncio.to_thread(storage.upload_file, io.BytesIO(prepared["thumb"]), record["thumb_key"], "image/webp")
+            await asyncio.to_thread(storage.upload_file, io.BytesIO(prepared["display"]), record["display_key"], "image/webp")
+        return record
+    except StorageConfigurationError as error:
+        raise HTTPException(503, str(error))
+    except UploadValidationError as error:
+        raise HTTPException(400, str(error))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Private object upload failed")
+        raise HTTPException(500, "File upload failed")
 
 @api.delete("/upload/{public_id:path}")
 async def delete_file(
     public_id: str,
     user=Depends(get_current_user)
 ):
-    try:
-        if not cloudinary.config().cloud_name:
-            raise HTTPException(status_code=500, detail="Cloudinary is not configured")
-        
-        # Try to delete as image first (default resource_type="image")
-        res = cloudinary.uploader.destroy(public_id, invalidate=True)
-        if res.get("result") != "ok":
-            # If not found or failed, try as raw file (e.g. PDF/Doc)
-            res = cloudinary.uploader.destroy(public_id, resource_type="raw", invalidate=True)
-            
-        return {"ok": True, "result": res.get("result")}
-    except Exception as e:
-        logger.error(f"Cloudinary destroy error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete from Cloudinary: {str(e)}")
+    # Legacy Cloudinary public IDs are deliberately never deleted: fallback is read-only.
+    raise HTTPException(410, "Legacy Cloudinary objects are read-only; remove the file from the patient record instead")
+
+@api.get("/files/{patient_id}/{file_id}")
+async def get_file(patient_id: str, file_id: str, variant: Literal["thumb", "display", "original"] = "original", user=Depends(get_current_user)):
+    patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not patient:
+        raise HTTPException(404, "Patient not found")
+    record = find_patient_file(patient, file_id)
+    if not record:
+        raise HTTPException(404, "File not found")
+    key = record.get(f"{variant}_key") if variant != "original" else record.get("key")
+    if not key:
+        raise HTTPException(404, "Requested file variant is unavailable")
+    logger.info("file_access user=%s patient=%s key=%s", user.get("id"), patient_id, key)
+    storage = make_storage()
+    if storage.backend == "mock":
+        try:
+            return StreamingResponse(storage.open_mock(key), media_type="image/webp" if variant != "original" else record.get("content_type"))
+        except FileNotFoundError:
+            raise HTTPException(404, "Stored object not found")
+    url = await asyncio.to_thread(storage.get_presigned_url, key, 300, "image/webp" if variant != "original" else record.get("content_type"), file_id)
+    return RedirectResponse(url=url, status_code=302)
 
 # ─── Treatments / Price Catalog ─────────────────────────────────────────────
 @api.get("/treatments")

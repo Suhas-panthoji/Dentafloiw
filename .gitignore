@@ -61,6 +61,7 @@ __pycache__/
 venv/
 .venv/
 .pytest_cache/
+.mock-storage/
 
 # Development tools
 chainlit.md

@@ -231,7 +231,21 @@ export default function FinancesPage() {
           <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer>
               <BarChart data={d.monthly} margin={{ top: 10, right: 20, bottom: 30, left: 30 }}>
-                <XAxis dataKey="month" tickFormatter={(m) => m.slice(5)} tick={{ fill: "var(--text)", fontSize: 12 }} axisLine={{ stroke: "rgba(230,234,240,0.4)" }} tickLine={{ stroke: "rgba(230,234,240,0.4)" }} label={{ value: "Month", position: "insideBottom", offset: -20, fill: "var(--text)", fontSize: 13, fontWeight: 700 }}/>
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={(m) => {
+                    if (!m) return "";
+                    const parts = m.split("-");
+                    if (parts.length < 2) return m;
+                    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                    const idx = parseInt(parts[1], 10) - 1;
+                    return months[idx] ? `${months[idx]} '${parts[0].slice(2)}` : m;
+                  }}
+                  tick={{ fill: "var(--text)", fontSize: 11 }}
+                  axisLine={{ stroke: "rgba(230,234,240,0.4)" }}
+                  tickLine={{ stroke: "rgba(230,234,240,0.4)" }}
+                  label={{ value: "Month", position: "insideBottom", offset: -20, fill: "var(--text)", fontSize: 13, fontWeight: 700 }}
+                />
                 <YAxis tick={{ fill: "var(--text)", fontSize: 12 }} axisLine={{ stroke: "rgba(230,234,240,0.4)" }} tickLine={{ stroke: "rgba(230,234,240,0.4)" }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} label={{ value: "Revenue (₹)", angle: -90, position: "insideLeft", dx: -10, fill: "var(--text)", fontSize: 13, fontWeight: 700 }}/>
                 <Tooltip formatter={(v) => inr(v)}/>
                 <Bar dataKey="revenue" fill="#0A6E6E" radius={[6,6,0,0]}/>

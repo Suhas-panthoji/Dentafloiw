@@ -4,6 +4,7 @@ import { api, formatErr } from "@/lib/api";
 import { calcAge, fmtDate, fullName, inr } from "@/lib/format";
 import { conditionLabel, normalizeTeethRecords } from "@/components/odontogram/toothConfig";
 import { toast } from "sonner";
+import SecureImage from "@/components/SecureImage";
 
 function InfoRow({ label, value, icon: Icon }) {
   if (!value && value !== 0) return null;
@@ -35,7 +36,7 @@ function SubInfoRow({ label, value }) {
   );
 }
 
-function ImageGallery({ images, title }) {
+function ImageGallery({ images, title, patientId }) {
   const [lightbox, setLightbox] = useState(null);
 
   if (!images || images.length === 0) return null;
@@ -46,7 +47,7 @@ function ImageGallery({ images, title }) {
       <div className="pvm-gallery-grid">
         {images.map((img) => (
           <div key={img.id} className="pvm-gallery-item" onClick={() => setLightbox(img)}>
-            <img src={img.data} alt={img.name || title} />
+            <SecureImage patientId={patientId} file={img.file || img.data} variant="thumb" alt={img.name || title} />
             <div className="pvm-gallery-name">{img.name}</div>
           </div>
         ))}
@@ -57,7 +58,7 @@ function ImageGallery({ images, title }) {
           <button className="pvm-lightbox-close" onClick={() => setLightbox(null)}>
             <X size={20} />
           </button>
-          <img src={lightbox.data} alt={lightbox.name || ""} onClick={(e) => e.stopPropagation()} />
+          <SecureImage patientId={patientId} file={lightbox.file || lightbox.data} variant="display" alt={lightbox.name || ""} onClick={(e) => e.stopPropagation()} />
           {lightbox.name && <div className="pvm-lightbox-caption">{lightbox.name}</div>}
         </div>
       )}
@@ -176,7 +177,7 @@ export default function PatientViewModal({ patientId, onClose, onEdit }) {
             {/* Patient Photo */}
             <div className="pvm-photo-section">
               {patient.photo ? (
-                <img src={patient.photo} alt={name} className="pvm-patient-photo" />
+                <SecureImage patientId={patient.id} file={patient.photo} variant="display" alt={name} className="pvm-patient-photo" />
               ) : (
                 <div className="pvm-photo-placeholder flex items-center justify-center bg-[var(--teal-light)] rounded-md border border-[var(--border)] w-full h-full">
                   <User size={64} className="text-[var(--teal)] opacity-60" />
@@ -358,8 +359,8 @@ export default function PatientViewModal({ patientId, onClose, onEdit }) {
           {/* Clinical Photos & Radiographs */}
           <div className="pvm-section">
             <SectionTitle>Images & Radiographs:</SectionTitle>
-            <ImageGallery images={clinicalPhotos} title="Clinical Photos" />
-            <ImageGallery images={radiographs} title="Radiographs" />
+            <ImageGallery images={clinicalPhotos} title="Clinical Photos" patientId={patient.id} />
+            <ImageGallery images={radiographs} title="Radiographs" patientId={patient.id} />
             {clinicalPhotos.length === 0 && radiographs.length === 0 && (
               <p className="pvm-empty-text">No images or radiographs uploaded.</p>
             )}

@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate, fullName, inr } from "@/lib/format";
 import { toast } from "sonner";
 import PatientViewModal from "@/components/PatientViewModal";
+import SecureImage from "@/components/SecureImage";
 
 function patientDue(p) {
   return (p.visits || []).reduce((s, v) => s + Math.max((+v.total || 0) - (+v.paid || 0), 0), 0);
@@ -111,29 +112,36 @@ export default function PatientsListPage() {
               const due = patientDue(p);
               const initials = ((p.general?.first_name?.[0] || "") + (p.general?.last_name?.[0] || "")).toUpperCase() || "?";
               return (
-                <li key={p.id} className="p-4 flex items-center gap-4 hover:bg-[var(--teal-light)] transition-colors flex-wrap sm:flex-nowrap" data-testid={`patient-row-${p.id}`}>
-                  <div className="w-11 h-11 shrink-0 rounded-full bg-[var(--teal-light)] flex items-center justify-center font-semibold text-[var(--teal)]">
-                    {p.photo ? <img src={p.photo} alt="" className="w-full h-full rounded-full object-cover"/> : initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{fullName(p)}</div>
-                    <div className="text-[12px] text-[var(--text-2)] flex items-center gap-3 flex-wrap mt-0.5">
-                      <span className="flex items-center gap-1"><Phone size={11}/>{p.general?.mobile || "—"}</span>
-                      <span className="flex items-center gap-1"><MapPin size={11}/>{p.general?.city || "—"}</span>
-                      <span>Last visit: {fmtDate(lastVisit(p)) || "—"}</span>
+                <li key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--teal-light)] transition-colors" data-testid={`patient-row-${p.id}`}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-11 h-11 shrink-0 rounded-full bg-[var(--teal-light)] flex items-center justify-center font-semibold text-[var(--teal)]">
+                      {p.photo ? <SecureImage patientId={p.id} file={p.photo} variant="thumb" alt="" className="w-full h-full rounded-full object-cover"/> : initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm sm:text-base text-[var(--text)] break-words">{fullName(p)}</div>
+                      <div className="text-[12px] text-[var(--text-2)] flex items-center gap-3 flex-wrap mt-1">
+                        <span className="flex items-center gap-1 shrink-0"><Phone size={11}/>{p.general?.mobile || "—"}</span>
+                        <span className="flex items-center gap-1 shrink-0"><MapPin size={11}/>{p.general?.city || "—"}</span>
+                        <span className="shrink-0">Last visit: {fmtDate(lastVisit(p)) || "—"}</span>
+                      </div>
                     </div>
                   </div>
-                  {due > 0 && <span className="df-badge df-badge-red shrink-0" data-testid={`due-badge-${p.id}`}>Due {inr(due)}</span>}
-                  <button onClick={() => setViewPatientId(p.id)} className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]" data-testid={`view-patient-${p.id}`}>
-                    <Eye size={14}/> View
-                  </button>
-                  {isDoctor && (
-                    <button className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]"
-                            style={{ color: "var(--danger)", borderColor: "rgba(248,113,113,0.30)" }}
-                            onClick={() => setConfirmId(p.id)} data-testid={`delete-patient-${p.id}`}>
-                      <Trash2 size={14}/>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 mt-2 sm:mt-0">
+                    {due > 0 && <span className="df-badge df-badge-red shrink-0" data-testid={`due-badge-${p.id}`}>Due {inr(due)}</span>}
+                    <button onClick={() => setViewPatientId(p.id)} className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]" data-testid={`view-patient-${p.id}`}>
+                      <Eye size={14}/> View
                     </button>
-                  )}
+                    {isDoctor && (
+                      <button className="df-btn df-btn-ghost py-1.5 px-3 text-[13px]"
+                              style={{ color: "var(--danger)", borderColor: "rgba(248,113,113,0.30)" }}
+                              onClick={() => setConfirmId(p.id)}
+                              aria-label={`Delete patient ${fullName(p)}`}
+                              title={`Delete patient ${fullName(p)}`}
+                              data-testid={`delete-patient-${p.id}`}>
+                        <Trash2 size={14}/>
+                      </button>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -145,6 +153,7 @@ export default function PatientsListPage() {
         <div className="flex items-center justify-center gap-2">
           {Array.from({ length: pageCount }).map((_, i) => (
             <button key={i} onClick={() => setPage(i + 1)}
+              aria-label={`Go to page ${i + 1}`}
               className={`df-chip ${page === i + 1 ? "active" : ""}`}>{i + 1}</button>
           ))}
         </div>

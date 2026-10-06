@@ -16,13 +16,15 @@ export function base64ToFile(base64Data, filename = "file") {
 }
 
 /**
- * Uploads a File object to Cloudinary via the backend upload endpoint.
+ * Uploads a File object to the private storage backend.
  * @param {File} file
  * @returns {Promise<{url: string, public_id: string, type: string}>}
  */
-export async function uploadFile(file) {
+export async function uploadFile(file, patientId, kind = "documents") {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("patient_id", patientId);
+  formData.append("kind", kind);
 
   const response = await api.post("/upload", formData, {
     headers: {
@@ -39,14 +41,14 @@ export async function uploadFile(file) {
  * @param {string} filename
  * @returns {Promise<{url: string, public_id: string, type: string}>}
  */
-export async function uploadBase64(base64Data, filename = "upload.png") {
+export async function uploadBase64(base64Data, filename = "upload.png", patientId, kind = "signature") {
   if (!base64Data) return null;
   if (base64Data.startsWith("http")) {
     return { url: base64Data, public_id: null };
   }
   try {
     const file = base64ToFile(base64Data, filename);
-    return await uploadFile(file);
+    return await uploadFile(file, patientId, kind);
   } catch (error) {
     console.error("Failed to upload base64 image:", error);
     throw error;

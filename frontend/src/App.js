@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { Agentation } from "agentation";
@@ -6,15 +6,24 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { safeStorage } from "@/lib/storage";
 import LoginPage from "@/pages/LoginPage";
 import Layout from "@/components/Layout";
-import DashboardPage from "@/pages/DashboardPage";
-import PatientsListPage from "@/pages/PatientsListPage";
-import PatientFormPage from "@/pages/PatientFormPage";
-import FinancesPage from "@/pages/FinancesPage";
-import PriceCatalogPage from "@/pages/PriceCatalogPage";
-import FollowUpsPage from "@/pages/FollowUpsPage";
-import SettingsPage from "@/pages/SettingsPage";
-import AccountManagementPage from "@/pages/AccountManagementPage";
 import "@/App.css";
+
+// Lazy-loaded routes for code splitting
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const PatientsListPage = lazy(() => import("@/pages/PatientsListPage"));
+const PatientFormPage = lazy(() => import("@/pages/PatientFormPage"));
+const FinancesPage = lazy(() => import("@/pages/FinancesPage"));
+const PriceCatalogPage = lazy(() => import("@/pages/PriceCatalogPage"));
+const FollowUpsPage = lazy(() => import("@/pages/FollowUpsPage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const AccountManagementPage = lazy(() => import("@/pages/AccountManagementPage"));
+
+const PageFallback = () => (
+  <div className="flex flex-col items-center justify-center p-12 text-[var(--text-2)] min-h-[300px]">
+    <div className="w-8 h-8 border-2 border-[var(--teal)] border-t-transparent rounded-full animate-spin mb-3" />
+    <span className="text-sm">Loading page…</span>
+  </div>
+);
 
 const getInitialTheme = () => {
   try {
@@ -56,21 +65,23 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors />
         {process.env.NODE_ENV === 'development' && <Agentation />}
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<Protected><Layout theme={theme} onToggleTheme={toggleTheme} /></Protected>}>
-            <Route index element={<DashboardPage />} />
-            <Route path="patients" element={<PatientsListPage />} />
-            <Route path="patients/new" element={<PatientFormPage mode="new" />} />
-            <Route path="patients/:id" element={<PatientFormPage mode="edit" />} />
-            <Route path="finances" element={<Protected doctorOnly><FinancesPage /></Protected>} />
-            <Route path="catalog" element={<Protected doctorOnly><PriceCatalogPage /></Protected>} />
-            <Route path="followups" element={<FollowUpsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="accounts" element={<Protected adminOnly><AccountManagementPage /></Protected>} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<Protected><Layout theme={theme} onToggleTheme={toggleTheme} /></Protected>}>
+              <Route index element={<DashboardPage />} />
+              <Route path="patients" element={<PatientsListPage />} />
+              <Route path="patients/new" element={<PatientFormPage mode="new" />} />
+              <Route path="patients/:id" element={<PatientFormPage mode="edit" />} />
+              <Route path="finances" element={<Protected doctorOnly><FinancesPage /></Protected>} />
+              <Route path="catalog" element={<Protected doctorOnly><PriceCatalogPage /></Protected>} />
+              <Route path="followups" element={<FollowUpsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="accounts" element={<Protected adminOnly><AccountManagementPage /></Protected>} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

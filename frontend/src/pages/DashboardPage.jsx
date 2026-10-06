@@ -38,11 +38,20 @@ export default function DashboardPage() {
   }, []);
 
   const d = data || {};
+  const getGreetingName = (name) => {
+    if (!name) return "Doctor";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length > 1 && /^dr\.?$/i.test(parts[0])) {
+      return `${parts[0]} ${parts[1]}`;
+    }
+    return parts[0];
+  };
+
   return (
     <div className="space-y-6 df-anim-in" data-testid="dashboard-page">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h1>Hello, {user?.name?.split(" ")[0] || "Doctor"}</h1>
+          <h1>Hello, {getGreetingName(user?.name)}</h1>
           <p className="text-[var(--text-2)] mt-1">Here's what's happening at your clinic today.</p>
         </div>
         <div className="text-sm text-[var(--text-2)]">{fmtDate(new Date())}</div>

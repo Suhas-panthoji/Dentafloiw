@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, formatErr } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { uploadFile, uploadBase64, deleteFile } from "@/lib/upload";
+import SecureImage from "@/components/SecureImage";
 import {
   INDIAN_STATES, DISEASES, ORAL_CONDITIONS, SOFT_TISSUES, HYGIENE_LEVELS, OCCLUSION_CLASSES,
   REFERRAL_SOURCES, COMMON_DRUGS, FREQUENCIES, calcAge, fmtDate, inr,
@@ -185,6 +186,7 @@ export default function PatientFormPage({ mode }) {
   };
 
   const capturePhoto = async () => {
+    if (!requireSavedGeneral()) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -199,8 +201,8 @@ export default function PatientFormPage({ mode }) {
 
     toast.loading("Uploading photo...", { id: "upload-photo" });
     try {
-      const res = await uploadBase64(data, "profile_camera.png");
-      setP((x) => ({ ...x, photo: res.url }));
+      const res = await uploadBase64(data, "profile_camera.png", p.id, "photo");
+      setP((x) => ({ ...x, photo: res }));
       toast.success("Photo captured and uploaded", { id: "upload-photo" });
     } catch (e) {
       toast.error("Failed to upload photo", { id: "upload-photo" });
@@ -209,10 +211,11 @@ export default function PatientFormPage({ mode }) {
 
   const uploadPhoto = async (file) => {
     if (!file) return;
+    if (!requireSavedGeneral()) return;
     toast.loading("Uploading photo...", { id: "upload-photo" });
     try {
-      const res = await uploadFile(file);
-      setP((x) => ({ ...x, photo: res.url }));
+      const res = await uploadFile(file, p.id, "photo");
+      setP((x) => ({ ...x, photo: res }));
       toast.success("Photo uploaded successfully", { id: "upload-photo" });
     } catch (e) {
       toast.error("Failed to upload photo", { id: "upload-photo" });
@@ -224,13 +227,12 @@ export default function PatientFormPage({ mode }) {
     toast.loading(`Uploading ${files.length} file(s)...`, { id: "upload-album" });
     try {
       const arr = await Promise.all([...files].map(async (f) => {
-        const res = await uploadFile(f);
+        const res = await uploadFile(f, p.id, album);
         return {
           id: crypto.randomUUID(),
           name: f.name,
           type: f.type,
-          data: res.url,
-          public_id: res.public_id,
+          file: res,
           uploaded_at: new Date().toISOString(),
         };
       }));
@@ -246,13 +248,6 @@ export default function PatientFormPage({ mode }) {
     if (!requireSavedGeneral()) return;
 
     const item = p[album]?.find((y) => y.id === fid);
-    if (item?.public_id) {
-      try {
-        await deleteFile(item.public_id);
-      } catch (e) {
-        console.error("Failed to delete file from Cloudinary:", e);
-      }
-    }
     setP((x) => ({ ...x, [album]: x[album].filter((y) => y.id !== fid) }));
   };
 
@@ -315,14 +310,13 @@ export default function PatientFormPage({ mode }) {
     if (!requireSavedGeneral()) return;
     toast.loading("Uploading document...", { id: "upload-doc" });
     try {
-      const res = await uploadFile(file);
+      const res = await uploadFile(file, p.id, "documents");
       const doc = {
         id: crypto.randomUUID(),
         name: file.name,
         type: file.type,
         category,
-        data: res.url,
-        public_id: res.public_id,
+        file: res,
         uploaded_at: new Date().toISOString(),
       };
       setP((x) => ({ ...x, documents: [...(x.documents || []), doc] }));
@@ -386,7 +380,7 @@ export default function PatientFormPage({ mode }) {
         <div className="df-card p-6 space-y-5">
           <div className="flex items-center gap-5 flex-wrap">
             <div className="w-28 h-28 rounded-full bg-[var(--teal-light)] border border-[var(--border)] flex items-center justify-center overflow-hidden">
-              {p.photo ? <img src={p.photo} alt="" className="w-full h-full object-cover"/>
+              {p.photo ? <SecureImage patientId={p.id} file={p.photo} variant="thumb" alt="" className="w-full h-full object-cover"/>
                 : <div className="text-[var(--teal-accent)] text-3xl font-semibold">
                   {(p.general.first_name?.[0] || "?") + (p.general.last_name?.[0] || "")}
                 </div>}
@@ -410,42 +404,75 @@ export default function PatientFormPage({ mode }) {
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
-            {[
-              ["First Name *","first_name","text"],["Last Name *","last_name","text"],
-            ].map(([l,k,t]) => (
-              <div key={k}><label className="df-label">{l}</label>
-                <input className="df-input" type={t} value={p.general[k]} onChange={(e) => setG(k, e.target.value)} data-testid={`field-${k}`}/></div>
-            ))}
-            <div><label className="df-label">Date of Birth *</label>
-              <input type="date" className="df-input" value={p.general.dob} onChange={(e) => setG("dob", e.target.value)} data-testid="field-dob"/></div>
-            <div><label className="df-label">Mobile Number *</label>
-              <input type="tel" className="df-input" value={p.general.mobile} onChange={(e) => setG("mobile", e.target.value)} placeholder="+91 98xxxxxxxx" data-testid="field-mobile"/></div>
-            <div><label className="df-label">Email</label>
-              <input type="email" className="df-input" value={p.general.email} onChange={(e) => setG("email", e.target.value)}/></div>
-            <div><label className="df-label">Gender *</label>
-              <select className="df-input" value={p.general.gender} onChange={(e) => setG("gender", e.target.value)}>
-                <option>Male</option><option>Female</option><option>Other</option></select></div>
-            <div><label className="df-label">Marital Status</label>
-              <select className="df-input" value={p.general.marital} onChange={(e) => setG("marital", e.target.value)}>
-                <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
-            <div><label className="df-label">Referred By</label>
-              <select className="df-input" value={p.general.referred_by} onChange={(e) => setG("referred_by", e.target.value)}>
-                {REFERRAL_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>
-            <div className="md:col-span-2"><label className="df-label">Occupation</label>
-              <input className="df-input" value={p.general.occupation} onChange={(e) => setG("occupation", e.target.value)}/></div>
+            <div>
+              <label htmlFor="gen-fn" className="df-label">First Name *</label>
+              <input id="gen-fn" className="df-input" type="text" value={p.general.first_name} onChange={(e) => setG("first_name", e.target.value)} data-testid="field-first_name"/>
+            </div>
+            <div>
+              <label htmlFor="gen-ln" className="df-label">Last Name *</label>
+              <input id="gen-ln" className="df-input" type="text" value={p.general.last_name} onChange={(e) => setG("last_name", e.target.value)} data-testid="field-last_name"/>
+            </div>
+            <div>
+              <label htmlFor="gen-dob" className="df-label">Date of Birth *</label>
+              <input id="gen-dob" type="date" className="df-input" value={p.general.dob} onChange={(e) => setG("dob", e.target.value)} data-testid="field-dob"/>
+            </div>
+            <div>
+              <label htmlFor="gen-mobile" className="df-label">Mobile Number *</label>
+              <input id="gen-mobile" type="tel" className="df-input" value={p.general.mobile} onChange={(e) => setG("mobile", e.target.value)} placeholder="+91 98xxxxxxxx" data-testid="field-mobile"/>
+            </div>
+            <div>
+              <label htmlFor="gen-email" className="df-label">Email</label>
+              <input id="gen-email" type="email" className="df-input" value={p.general.email} onChange={(e) => setG("email", e.target.value)}/>
+            </div>
+            <div>
+              <label htmlFor="gen-gender" className="df-label">Gender *</label>
+              <select id="gen-gender" className="df-input" value={p.general.gender} onChange={(e) => setG("gender", e.target.value)}>
+                <option>Male</option><option>Female</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="gen-marital" className="df-label">Marital Status</label>
+              <select id="gen-marital" className="df-input" value={p.general.marital} onChange={(e) => setG("marital", e.target.value)}>
+                <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="gen-ref" className="df-label">Referred By</label>
+              <select id="gen-ref" className="df-input" value={p.general.referred_by} onChange={(e) => setG("referred_by", e.target.value)}>
+                {REFERRAL_SOURCES.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="gen-occ" className="df-label">Occupation</label>
+              <input id="gen-occ" className="df-input" value={p.general.occupation} onChange={(e) => setG("occupation", e.target.value)}/>
+            </div>
           </div>
 
           <div className="border-t border-[var(--border)] pt-4 space-y-3">
             <h3>Address</h3>
-            <div><label className="df-label">Full Address</label>
-              <textarea className="df-input" rows={2} value={p.general.address} onChange={(e) => setG("address", e.target.value)}/></div>
+            <div>
+              <label htmlFor="gen-addr" className="df-label">Full Address</label>
+              <textarea id="gen-addr" className="df-input" rows={2} value={p.general.address} onChange={(e) => setG("address", e.target.value)}/>
+            </div>
             <div className="grid md:grid-cols-4 gap-3">
-              <div><label className="df-label">Area / Street</label><input className="df-input" value={p.general.area} onChange={(e) => setG("area", e.target.value)}/></div>
-              <div><label className="df-label">City</label><input className="df-input" value={p.general.city} onChange={(e) => setG("city", e.target.value)}/></div>
-              <div><label className="df-label">State</label>
-                <select className="df-input" value={p.general.state} onChange={(e) => setG("state", e.target.value)}>
-                  {INDIAN_STATES.map((s) => <option key={s}>{s}</option>)}</select></div>
-              <div><label className="df-label">Pincode</label><input className="df-input" value={p.general.pincode} onChange={(e) => setG("pincode", e.target.value)}/></div>
+              <div>
+                <label htmlFor="gen-area" className="df-label">Area / Street</label>
+                <input id="gen-area" className="df-input" value={p.general.area} onChange={(e) => setG("area", e.target.value)}/>
+              </div>
+              <div>
+                <label htmlFor="gen-city" className="df-label">City</label>
+                <input id="gen-city" className="df-input" value={p.general.city} onChange={(e) => setG("city", e.target.value)}/>
+              </div>
+              <div>
+                <label htmlFor="gen-state" className="df-label">State</label>
+                <select id="gen-state" className="df-input" value={p.general.state} onChange={(e) => setG("state", e.target.value)}>
+                  {INDIAN_STATES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="gen-pin" className="df-label">Pincode</label>
+                <input id="gen-pin" className="df-input" value={p.general.pincode} onChange={(e) => setG("pincode", e.target.value)}/>
+              </div>
             </div>
           </div>
         </div>
@@ -663,7 +690,7 @@ export default function PatientFormPage({ mode }) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {p[album.key].map((img) => (
                     <div key={img.id} className="relative group">
-                      <img src={img.data} alt={img.name} className="w-full h-28 object-cover rounded-md border border-[var(--border)] cursor-pointer"
+                      <SecureImage patientId={p.id} file={img.file || img.data} variant="thumb" alt={img.name} className="w-full h-28 object-cover rounded-md border border-[var(--border)] cursor-pointer"
                            onClick={() => openImageInNewPage(img)}/>
                       <div className="text-[11px] truncate mt-1">{img.name}</div>
                       {isDoctor && (
@@ -695,8 +722,8 @@ export default function PatientFormPage({ mode }) {
               }
               toast.loading("Uploading signature...", { id: "upload-sig" });
               try {
-                const res = await uploadBase64(v, "signature.png");
-                setP((x) => ({ ...x, signature: res.url }));
+                const res = await uploadBase64(v, "signature.png", p.id, "signature");
+                setP((x) => ({ ...x, signature: res }));
                 toast.success("Signature saved", { id: "upload-sig" });
               } catch (e) {
                 toast.error("Failed to upload signature", { id: "upload-sig" });

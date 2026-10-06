@@ -88,11 +88,12 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
               type="button"
               className="df-btn df-btn-ghost df-theme-toggle"
               onClick={onToggleTheme}
-              aria-label={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+              aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+              title={`Switch to ${isDark ? "light" : "dark"} mode`}
               data-testid="theme-toggle"
             >
-              {isDark ? <Moon size={16}/> : <Sun size={16}/>}
-              <span>{isDark ? "Dark" : "Light"}</span>
+              {isDark ? <Sun size={16}/> : <Moon size={16}/>}
+              <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
             </button>
             <div className="text-right hidden sm:block">
               <div className="text-sm font-medium">{user?.name}</div>
@@ -104,9 +105,11 @@ export default function Layout({ theme = "dark", onToggleTheme }) {
             <button
               className="df-btn df-btn-ghost df-logout"
               onClick={async () => { await logout(); nav("/login"); }}
+              aria-label="Logout"
+              title="Logout"
               data-testid="logout-btn"
             >
-              <LogOut size={16}/> <span>Logout</span>
+              <LogOut size={16}/> <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </header>
