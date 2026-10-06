@@ -275,7 +275,7 @@ async def seed():
     await db.users.create_index("email", unique=True)
     await db.odontograms.create_index("id", unique=True)
     await seed_user(os.environ["DOCTOR_EMAIL"], os.environ["DOCTOR_PASSWORD"], "Dr. Naveen Shamanur", "doctor")
-    await seed_user(os.environ["STAFF_EMAIL"], os.environ["STAFF_PASSWORD"], "Kavita Reddy", "staff")
+    await seed_user(os.environ["STAFF_EMAIL"], os.environ["STAFF_PASSWORD"], "Staff", "staff")
     if await db.odontograms.count_documents({}) == 0:
         for sample in SAMPLE_ODONTOGRAMS:
             doc = {

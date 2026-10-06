@@ -794,7 +794,7 @@ async def seed():
     if doctor_email and doctor_pass:
         await seed_user(doctor_email, doctor_pass, "Dr. Naveen Shamanur", "doctor")
     if staff_email and staff_pass:
-        await seed_user(staff_email, staff_pass, "Kavita Reddy", "staff")
+        await seed_user(staff_email, staff_pass, "Staff", "staff")
     if admin_email and admin_pass:
         await seed_user(admin_email, admin_pass, "Clinic Administrator", "admin")
     if await db.treatments.count_documents({}) == 0:
