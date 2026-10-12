@@ -251,10 +251,28 @@ export default function PatientFormPage({ mode }) {
     setP((x) => ({ ...x, [album]: x[album].filter((y) => y.id !== fid) }));
   };
 
-  const openImageInNewPage = (img) => {
+  const openImageInNewPage = async (img) => {
+    let imgSrc = img.data;
+    if (!imgSrc && img.file) {
+      if (typeof img.file === "string") {
+        imgSrc = img.file;
+      } else if (img.file.key) {
+        try {
+          const res = await api.get(`/files/by-key?key=${encodeURIComponent(img.file.key)}&redirect=false`);
+          imgSrc = res.data?.url;
+        } catch (e) {}
+      } else if (img.file.id) {
+        try {
+          const res = await api.get(`/files/${p.id}/${img.file.id}?variant=original&redirect=false`);
+          imgSrc = res.data?.url;
+        } catch (e) {}
+      }
+    }
+    if (!imgSrc) return;
+
     const imagePage = window.open("", "_blank");
     if (!imagePage) {
-      window.open(img.data, "_blank");
+      window.open(imgSrc, "_blank");
       return;
     }
 
@@ -298,7 +316,7 @@ export default function PatientFormPage({ mode }) {
         </head>
         <body>
           <header>${title}</header>
-          <main><img src="${img.data}" alt="${title}" /></main>
+          <main><img src="${imgSrc}" alt="${title}" /></main>
         </body>
       </html>
     `);

@@ -138,8 +138,21 @@ def object_extension(content_type: str) -> str:
     return {"image/webp": "webp", "image/png": "png", "image/jpeg": "jpg", "application/pdf": "pdf", "application/dicom": "dcm"}.get(content_type, "bin")
 
 def find_patient_file(patient: Dict[str, Any], file_id: str):
+    """Look up a file record by id first, then fall back to matching by R2 key,
+    or special patient photo/signature properties.
+    Migrated records from Cloudinary don't carry an 'id' field, so the key-
+    based fallback is essential."""
+    if file_id == "photo" and isinstance(patient.get("photo"), dict) and patient["photo"].get("key"):
+        return patient["photo"]
+    if file_id == "signature" and isinstance(patient.get("signature"), dict) and patient["signature"].get("key"):
+        return patient["signature"]
     for record in storage_entries(patient):
         if record.get("id") == file_id:
+            return record
+    # Fallback: treat file_id as an R2 key (or key suffix)
+    for record in storage_entries(patient):
+        key = record.get("key", "")
+        if key == file_id or key.endswith("/" + file_id):
             return record
     return None
 
@@ -468,24 +481,53 @@ async def delete_file(
     raise HTTPException(410, "Legacy Cloudinary objects are read-only; remove the file from the patient record instead")
 
 @api.get("/files/{patient_id}/{file_id}")
-async def get_file(patient_id: str, file_id: str, variant: Literal["thumb", "display", "original"] = "original", user=Depends(get_current_user)):
+async def get_file(patient_id: str, file_id: str, variant: Literal["thumb", "display", "original"] = "original", redirect: bool = True, user=Depends(get_current_user)):
     patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     if not patient:
         raise HTTPException(404, "Patient not found")
     record = find_patient_file(patient, file_id)
     if not record:
         raise HTTPException(404, "File not found")
-    key = record.get(f"{variant}_key") if variant != "original" else record.get("key")
+    key = (record.get(f"{variant}_key") if variant != "original" else None) or record.get("key")
     if not key:
         raise HTTPException(404, "Requested file variant is unavailable")
+    content_type = "image/webp" if (variant != "original" and record.get(f"{variant}_key")) else record.get("content_type", "image/jpeg")
     logger.info("file_access user=%s patient=%s key=%s", user.get("id"), patient_id, key)
     storage = make_storage()
     if storage.backend == "mock":
         try:
-            return StreamingResponse(storage.open_mock(key), media_type="image/webp" if variant != "original" else record.get("content_type"))
+            return StreamingResponse(storage.open_mock(key), media_type=content_type)
         except FileNotFoundError:
             raise HTTPException(404, "Stored object not found")
-    url = await asyncio.to_thread(storage.get_presigned_url, key, 300, "image/webp" if variant != "original" else record.get("content_type"), file_id)
+    url = await asyncio.to_thread(storage.get_presigned_url, key, 3600, content_type, file_id)
+    if not redirect:
+        return {"url": url}
+    return RedirectResponse(url=url, status_code=302)
+
+@api.get("/files/by-key")
+async def get_file_by_key(key: str, redirect: bool = True, user=Depends(get_current_user)):
+    """Serve an R2 object directly by its storage key.
+    Used by the frontend for migrated records that lack a file id."""
+    if not key or ".." in key:
+        raise HTTPException(400, "Invalid key")
+    # Verify the key belongs to a patient the user can access
+    storage = make_storage()
+    if not await asyncio.to_thread(storage.exists, key):
+        raise HTTPException(404, "Object not found in storage")
+    # Determine content type from the key extension
+    ext = key.rsplit(".", 1)[-1].lower() if "." in key else ""
+    ct_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+              "webp": "image/webp", "pdf": "application/pdf", "dcm": "application/dicom"}
+    content_type = ct_map.get(ext, "application/octet-stream")
+    logger.info("file_by_key user=%s key=%s", user.get("id"), key)
+    if storage.backend == "mock":
+        try:
+            return StreamingResponse(storage.open_mock(key), media_type=content_type)
+        except FileNotFoundError:
+            raise HTTPException(404, "Stored object not found")
+    url = await asyncio.to_thread(storage.get_presigned_url, key, 3600, content_type)
+    if not redirect:
+        return {"url": url}
     return RedirectResponse(url=url, status_code=302)
 
 # ─── Treatments / Price Catalog ─────────────────────────────────────────────

@@ -396,7 +396,10 @@ export default function PatientViewModal({ patientId, onClose, onEdit }) {
               <div className="pvm-subsection">
                 <h3 className="pvm-subsection-title">Digital Signature</h3>
                 <div className="pvm-signature-container">
-                  <img src={patient.signature} alt="Patient Signature" className="pvm-signature-img" />
+                  {typeof patient.signature === "string"
+                    ? <img src={patient.signature} alt="Patient Signature" className="pvm-signature-img" />
+                    : <SecureImage patientId={patient.id} file={patient.signature} variant="original" alt="Patient Signature" className="pvm-signature-img" />
+                  }
                 </div>
               </div>
             )}
