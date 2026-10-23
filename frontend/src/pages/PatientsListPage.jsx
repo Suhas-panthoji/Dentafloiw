@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate, fullName, inr } from "@/lib/format";
 import { toast } from "sonner";
 import PatientViewModal from "@/components/PatientViewModal";
-import SecureImage from "@/components/SecureImage";
 
 
 export default function PatientsListPage() {
@@ -97,12 +96,20 @@ export default function PatientsListPage() {
               const initials = ((p.general?.first_name?.[0] || "") + (p.general?.last_name?.[0] || "")).toUpperCase() || "?";
               return (
                 <li key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--teal-light)] transition-colors" data-testid={`patient-row-${p.id}`}>
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-11 h-11 shrink-0 rounded-full bg-[var(--teal-light)] flex items-center justify-center font-semibold text-[var(--teal)]">
-                      {p.photo ? <SecureImage patientId={p.id} file={p.photo} variant="thumb" alt="" className="w-full h-full rounded-full object-cover"/> : initials}
+                  <div
+                    className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer group"
+                    onClick={() => setViewPatientId(p.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setViewPatientId(p.id); } }}
+                    title={`View profile of ${fullName(p)}`}
+                    data-testid={`patient-profile-link-${p.id}`}
+                  >
+                    <div className="w-11 h-11 shrink-0 rounded-full bg-[var(--teal-light)] flex items-center justify-center font-semibold text-[var(--teal)] select-none group-hover:ring-2 group-hover:ring-[var(--teal)] transition-all">
+                      {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-sm sm:text-base text-[var(--text)] break-words">{fullName(p)}</div>
+                      <div className="font-semibold text-sm sm:text-base text-[var(--text)] break-words group-hover:text-[var(--teal)] transition-colors">{fullName(p)}</div>
                       <div className="text-[12px] text-[var(--text-2)] flex items-center gap-3 flex-wrap mt-1">
                         <span className="flex items-center gap-1 shrink-0"><Phone size={11}/>{p.general?.mobile || "—"}</span>
                         <span className="flex items-center gap-1 shrink-0"><MapPin size={11}/>{p.general?.city || "—"}</span>
