@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, UserPlus, Trash2, Phone, Eye, MapPin } from "lucide-react";
 import { api, formatErr } from "@/lib/api";
@@ -7,10 +7,21 @@ import { fmtDate, fullName, inr } from "@/lib/format";
 import { toast } from "sonner";
 import PatientViewModal from "@/components/PatientViewModal";
 
+function patientDue(p) {
+  if (p.due !== undefined) return p.due;
+  return (p.visits || []).reduce((s, v) => s + Math.max((+v.total || 0) - (+v.paid || 0), 0), 0);
+}
+
+function lastVisit(p) {
+  if (p.last_visit) return p.last_visit;
+  const dates = (p.visits || []).map((v) => v.date).filter(Boolean).sort();
+  return dates.length ? dates[dates.length - 1] : null;
+}
 
 export default function PatientsListPage() {
   const { isDoctor } = useAuth();
   const [patients, setPatients] = useState([]);
+  const [isServerPaginated, setIsServerPaginated] = useState(false);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -21,22 +32,61 @@ export default function PatientsListPage() {
   const nav = useNavigate();
   const PAGE_SIZE = 20;
 
-  const load = () => api.get("/patients", { params: { page, page_size: PAGE_SIZE, q, filter } })
-    .then((r) => {
-      const items = r.data.items || [];
-      setPatients(items);
-      setTotal(r.data.total || 0);
-    })
-    .catch((e) => toast.error(formatErr(e)))
-    .finally(() => setLoading(false));
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
-    const timer = window.setTimeout(load, 250);
-    return () => window.clearTimeout(timer);
-  }, [page, q, filter]);
+    return api.get("/patients", { params: { page, page_size: PAGE_SIZE, q, filter } })
+      .then((r) => {
+        const data = r.data;
+        if (Array.isArray(data)) {
+          setPatients(data);
+          setIsServerPaginated(false);
+        } else {
+          setPatients(data?.items || []);
+          setTotal(data?.total || 0);
+          setIsServerPaginated(true);
+        }
+      })
+      .catch((e) => toast.error(formatErr(e)))
+      .finally(() => setLoading(false));
+  };
 
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const slice = patients;
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (isServerPaginated) {
+      const timer = window.setTimeout(load, 250);
+      return () => window.clearTimeout(timer);
+    }
+  }, [page, q, filter, isServerPaginated]);
+
+  const filtered = useMemo(() => {
+    if (isServerPaginated) return patients;
+    const ql = q.trim().toLowerCase();
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    return patients.filter((p) => {
+      const name = fullName(p).toLowerCase();
+      const mobile = (p.general?.mobile || "").toLowerCase();
+      const email = (p.general?.email || "").toLowerCase();
+      if (ql && !(name.includes(ql) || mobile.includes(ql) || email.includes(ql))) return false;
+      if (filter === "today") {
+        const has = (p.visits || []).some((v) => (v.date || "").startsWith(today));
+        if (!has) return false;
+      } else if (filter === "week") {
+        const has = (p.visits || []).some((v) => v.date && v.date >= weekAgo);
+        if (!has) return false;
+      } else if (filter === "dues") {
+        if (patientDue(p) <= 0) return false;
+      }
+      return true;
+    });
+  }, [patients, q, filter, isServerPaginated]);
+
+  const displayTotal = isServerPaginated ? total : filtered.length;
+  const pageCount = Math.max(1, Math.ceil(displayTotal / PAGE_SIZE));
+  const slice = isServerPaginated ? patients : filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const onDelete = async () => {
     try {
@@ -76,7 +126,7 @@ export default function PatientsListPage() {
           </div>
         </div>
         <div className="text-[12px] text-[var(--text-2)]">
-          Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total} patients
+          Showing {displayTotal === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, displayTotal)} of {displayTotal} patients
         </div>
       </div>
 
@@ -92,7 +142,7 @@ export default function PatientsListPage() {
         ) : (
           <ul className="divide-y divide-[var(--border)]">
             {slice.map((p) => {
-              const due = p.due || 0;
+              const due = patientDue(p);
               const initials = ((p.general?.first_name?.[0] || "") + (p.general?.last_name?.[0] || "")).toUpperCase() || "?";
               return (
                 <li key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--teal-light)] transition-colors" data-testid={`patient-row-${p.id}`}>
@@ -113,7 +163,7 @@ export default function PatientsListPage() {
                       <div className="text-[12px] text-[var(--text-2)] flex items-center gap-3 flex-wrap mt-1">
                         <span className="flex items-center gap-1 shrink-0"><Phone size={11}/>{p.general?.mobile || "—"}</span>
                         <span className="flex items-center gap-1 shrink-0"><MapPin size={11}/>{p.general?.city || "—"}</span>
-                        <span className="shrink-0">Last visit: {fmtDate(p.last_visit) || "—"}</span>
+                        <span className="shrink-0">Last visit: {fmtDate(lastVisit(p)) || "—"}</span>
                       </div>
                     </div>
                   </div>
