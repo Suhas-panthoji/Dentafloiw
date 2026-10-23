@@ -398,7 +398,7 @@ export default function PatientFormPage({ mode }) {
         <div className="df-card p-6 space-y-5">
           <div className="flex items-center gap-5 flex-wrap">
             <div className="w-28 h-28 rounded-full bg-[var(--teal-light)] border border-[var(--border)] flex items-center justify-center overflow-hidden">
-              {p.photo ? <SecureImage patientId={p.id} file={p.photo} variant="thumb" alt="" className="w-full h-full object-cover"/>
+              {p.photo ? <SecureImage patientId={p.id} file={p.photo} variant="thumb" alt="" className="w-full h-full object-cover" eager/>
                 : <div className="text-[var(--teal-accent)] text-3xl font-semibold">
                   {(p.general.first_name?.[0] || "?") + (p.general.last_name?.[0] || "")}
                 </div>}

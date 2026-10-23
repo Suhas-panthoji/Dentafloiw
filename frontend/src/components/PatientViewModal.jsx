@@ -6,6 +6,7 @@ import { conditionLabel, normalizeTeethRecords } from "@/components/odontogram/t
 import { toast } from "sonner";
 import SecureImage from "@/components/SecureImage";
 
+
 function InfoRow({ label, value, icon: Icon }) {
   if (!value && value !== 0) return null;
   return (
@@ -78,6 +79,8 @@ export default function PatientViewModal({ patientId, onClose, onEdit }) {
       .catch((e) => { toast.error(formatErr(e)); onClose(); })
       .finally(() => setLoading(false));
   }, [patientId]);
+
+
 
   useEffect(() => {
     const handleEsc = (e) => { if (e.key === "Escape") onClose(); };
@@ -177,7 +180,7 @@ export default function PatientViewModal({ patientId, onClose, onEdit }) {
             {/* Patient Photo */}
             <div className="pvm-photo-section">
               {patient.photo ? (
-                <SecureImage patientId={patient.id} file={patient.photo} variant="display" alt={name} className="pvm-patient-photo" />
+                <SecureImage patientId={patient.id} file={patient.photo} variant="display" alt={name} className="pvm-patient-photo" eager />
               ) : (
                 <div className="pvm-photo-placeholder flex items-center justify-center bg-[var(--teal-light)] rounded-md border border-[var(--border)] w-full h-full">
                   <User size={64} className="text-[var(--teal)] opacity-60" />

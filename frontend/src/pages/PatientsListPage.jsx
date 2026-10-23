@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, UserPlus, Trash2, Phone, Eye, MapPin } from "lucide-react";
 import { api, formatErr } from "@/lib/api";
@@ -8,13 +8,6 @@ import { toast } from "sonner";
 import PatientViewModal from "@/components/PatientViewModal";
 import SecureImage from "@/components/SecureImage";
 
-function patientDue(p) {
-  return (p.visits || []).reduce((s, v) => s + Math.max((+v.total || 0) - (+v.paid || 0), 0), 0);
-}
-function lastVisit(p) {
-  const ds = (p.visits || []).map((v) => v.date).filter(Boolean).sort();
-  return ds[ds.length - 1] || "";
-}
 
 export default function PatientsListPage() {
   const { isDoctor } = useAuth();
@@ -22,38 +15,29 @@ export default function PatientsListPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [confirmId, setConfirmId] = useState(null);
   const [viewPatientId, setViewPatientId] = useState(null);
   const nav = useNavigate();
   const PAGE_SIZE = 20;
 
-  const load = () => api.get("/patients").then((r) => setPatients(r.data)).catch((e) => toast.error(formatErr(e)));
-  useEffect(() => { load(); }, []);
+  const load = () => api.get("/patients", { params: { page, page_size: PAGE_SIZE, q, filter } })
+    .then((r) => {
+      const items = r.data.items || [];
+      setPatients(items);
+      setTotal(r.data.total || 0);
+    })
+    .catch((e) => toast.error(formatErr(e)))
+    .finally(() => setLoading(false));
+  useEffect(() => {
+    setLoading(true);
+    const timer = window.setTimeout(load, 250);
+    return () => window.clearTimeout(timer);
+  }, [page, q, filter]);
 
-  const filtered = useMemo(() => {
-    const ql = q.trim().toLowerCase();
-    const today = new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-    return patients.filter((p) => {
-      const name = fullName(p).toLowerCase();
-      const mobile = (p.general?.mobile || "").toLowerCase();
-      const email = (p.general?.email || "").toLowerCase();
-      if (ql && !(name.includes(ql) || mobile.includes(ql) || email.includes(ql))) return false;
-      if (filter === "today") {
-        const has = (p.visits || []).some((v) => (v.date || "").startsWith(today));
-        if (!has) return false;
-      } else if (filter === "week") {
-        const has = (p.visits || []).some((v) => v.date && v.date >= weekAgo);
-        if (!has) return false;
-      } else if (filter === "dues") {
-        if (patientDue(p) <= 0) return false;
-      }
-      return true;
-    });
-  }, [patients, q, filter]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const slice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const slice = patients;
 
   const onDelete = async () => {
     try {
@@ -93,12 +77,12 @@ export default function PatientsListPage() {
           </div>
         </div>
         <div className="text-[12px] text-[var(--text-2)]">
-          Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} patients
+          Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total} patients
         </div>
       </div>
 
       <div className="df-card overflow-hidden">
-        {slice.length === 0 ? (
+        {!loading && slice.length === 0 ? (
           <div className="p-12 text-center text-[var(--text-2)]">
             <div className="w-14 h-14 mx-auto rounded-full bg-[var(--teal-light)] flex items-center justify-center mb-3">
               <UserPlus className="text-[var(--teal)]" size={20}/>
@@ -109,7 +93,7 @@ export default function PatientsListPage() {
         ) : (
           <ul className="divide-y divide-[var(--border)]">
             {slice.map((p) => {
-              const due = patientDue(p);
+              const due = p.due || 0;
               const initials = ((p.general?.first_name?.[0] || "") + (p.general?.last_name?.[0] || "")).toUpperCase() || "?";
               return (
                 <li key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--teal-light)] transition-colors" data-testid={`patient-row-${p.id}`}>
@@ -122,7 +106,7 @@ export default function PatientsListPage() {
                       <div className="text-[12px] text-[var(--text-2)] flex items-center gap-3 flex-wrap mt-1">
                         <span className="flex items-center gap-1 shrink-0"><Phone size={11}/>{p.general?.mobile || "—"}</span>
                         <span className="flex items-center gap-1 shrink-0"><MapPin size={11}/>{p.general?.city || "—"}</span>
-                        <span className="shrink-0">Last visit: {fmtDate(lastVisit(p)) || "—"}</span>
+                        <span className="shrink-0">Last visit: {fmtDate(p.last_visit) || "—"}</span>
                       </div>
                     </div>
                   </div>
