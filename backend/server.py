@@ -23,7 +23,7 @@ import jwt
 import certifi
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict, Literal
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Query, BackgroundTasks
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
@@ -31,8 +31,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from storage import make_storage, StorageConfigurationError
 from image_pipeline import prepare_upload, UploadValidationError
+from backup.coverage import assert_collection_coverage
+from backup.service import backup_patient, backup_system_record, retry_pending, stamp_patient, stamp_system
 
-# â”€â”€â”€ Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Setup ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dentaflow")
 
@@ -57,7 +59,7 @@ USAGE_CACHE_TTL_SECONDS = 300
 USAGE_REFRESH_COOLDOWN_SECONDS = 30
 usage_cache = {"value": None, "expires_at": 0.0, "last_refresh_at": 0.0}
 
-# â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Helpers ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 def hash_pw(p: str) -> str:
     return bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
 
@@ -213,7 +215,7 @@ async def build_usage_snapshot() -> Dict[str, Any]:
 
     return {"updated_at": now_iso(), "render": render, "cloudinary": cloudinary_usage, "mongo": mongo}
 
-# â”€â”€â”€ Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Models ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
@@ -259,7 +261,7 @@ class TreatmentIn(BaseModel):
     lab_cost: float = 0
     category: str = "Restorative"
 
-# â”€â”€â”€ Auth Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Auth Endpoints ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.post("/auth/login", response_model=LoginOut)
 async def login(body: LoginIn, request: Request):
     email = body.email.lower().strip()
@@ -300,7 +302,7 @@ async def active_sessions(user=Depends(require_doctor)):
     ).to_list(100)
     return sessions
 
-# â”€â”€â”€ Administrator account management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Administrator account management ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.get("/admin/users")
 async def list_users(user=Depends(require_admin)):
     """Return account metadata only; password hashes are intentionally excluded."""
@@ -322,6 +324,15 @@ async def admin_usage(refresh: bool = False, user=Depends(require_admin)):
     snapshot = await build_usage_snapshot()
     usage_cache.update({"value": snapshot, "expires_at": time.monotonic() + USAGE_CACHE_TTL_SECONDS})
     return snapshot
+
+@api.post("/admin/backups/retry")
+async def retry_backups(seconds: int = Query(20, ge=1, le=55), user=Depends(require_admin)):
+    return {"completed": await retry_pending(db, seconds)}
+
+@api.get("/admin/backups/status")
+async def backup_status(user=Depends(require_admin)):
+    rows = await db.patients.aggregate([{"$group": {"_id": "$backup.status", "count": {"$sum": 1}}}]).to_list(20)
+    return {"patients": {row["_id"] or "pending": row["count"] for row in rows}}
 
 @api.post("/admin/users", response_model=UserOut, status_code=201)
 async def create_user(body: ManagedUserIn, user=Depends(require_admin)):
@@ -381,16 +392,17 @@ async def update_user(uid: str, body: ManagedUserUpdate, user=Depends(require_ad
     updated = await db.users.find_one({"id": uid}, {"_id": 0, "password_hash": 0})
     return updated
 
-# â”€â”€â”€ Patients â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Patients ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.post("/patients")
-async def create_patient(body: PatientIn, user=Depends(get_current_user)):
+async def create_patient(body: PatientIn, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
     pid = str(uuid.uuid4())
-    doc = body.model_dump()
+    doc = stamp_patient(body.model_dump())
     doc["id"] = pid
     doc["created_at"] = now_iso()
     doc["updated_at"] = now_iso()
     doc["created_by"] = user["email"]
     await db.patients.insert_one(doc)
+    background_tasks.add_task(backup_patient, db, pid)
     doc.pop("_id", None)
     return doc
 
@@ -412,13 +424,14 @@ async def get_patient(pid: str, user=Depends(get_current_user)):
     return p
 
 @api.put("/patients/{pid}")
-async def update_patient(pid: str, body: PatientIn, user=Depends(get_current_user)):
+async def update_patient(pid: str, body: PatientIn, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
     existing = await db.patients.find_one({"id": pid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Patient not found")
-    update = body.model_dump()
+    update = stamp_patient(body.model_dump(), existing)
     update["updated_at"] = now_iso()
     await db.patients.update_one({"id": pid}, {"$set": update})
+    background_tasks.add_task(backup_patient, db, pid)
     retained_keys = {item.get("key") for item in storage_entries(update)}
     for item in storage_entries(existing):
         if item.get("key") not in retained_keys:
@@ -435,7 +448,7 @@ async def delete_patient(pid: str, user=Depends(require_doctor)):
     await asyncio.to_thread(delete_storage_entries, patient)
     return {"ok": True}
 
-# â”€â”€â”€ File Uploads (Cloudinary) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ File Uploads (Cloudinary) ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
@@ -530,7 +543,7 @@ async def get_file_by_key(key: str, redirect: bool = True, user=Depends(get_curr
         return {"url": url}
     return RedirectResponse(url=url, status_code=302)
 
-# â”€â”€â”€ Treatments / Price Catalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Treatments / Price Catalog ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.get("/treatments")
 async def list_treatments(user=Depends(get_current_user)):
     return await db.treatments.find({}, {"_id": 0}).sort("name", 1).to_list(500)
@@ -558,7 +571,7 @@ async def delete_treatment(tid: str, user=Depends(require_doctor)):
     await db.treatments.delete_one({"id": tid})
     return {"ok": True}
 
-# â”€â”€â”€ Finances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Finances ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.get("/finances/summary")
 async def finances(user=Depends(require_doctor)):
     patients = await db.patients.find({}, {"_id": 0}).to_list(2000)
@@ -628,7 +641,7 @@ async def finances(user=Depends(require_doctor)):
         "visits": sorted(visit_rows, key=lambda x: x["date"], reverse=True),
     }
 
-# â”€â”€â”€ Follow-ups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Follow-ups ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.get("/followups")
 async def followups(user=Depends(get_current_user)):
     today = datetime.now(timezone.utc).date().isoformat()
@@ -696,7 +709,7 @@ async def followups(user=Depends(get_current_user)):
         "upcoming": sorted(upcoming, key=lambda x: x["followup_date"]),
     }
 
-# â”€â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Dashboard ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 @api.get("/dashboard")
 async def dashboard(user=Depends(get_current_user)):
     today = datetime.now(timezone.utc).date().isoformat()
@@ -747,7 +760,7 @@ async def dashboard(user=Depends(get_current_user)):
 async def root():
     return {"app": "DentaFlow", "status": "ok"}
 
-# â”€â”€â”€ Seeding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ÄÄÄ Seeding ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
 DEMO_TREATMENTS = [
     {"name": "Consultation", "fee": 500, "lab_cost": 0, "category": "Diagnostic"},
     {"name": "Scaling & Polishing", "fee": 1500, "lab_cost": 0, "category": "Restorative"},
@@ -808,7 +821,7 @@ DEMO_PATIENTS = [
                     "referred_by": "Doctor Referral", "occupation": "Banker", "address": "Sector 14",
                     "area": "Sector 14", "city": "Gurgaon", "state": "Haryana", "pincode": "122001"},
         "medical": {"diseases": ["Diabetes"], "medications": [{"name": "Metformin", "dosage": "500mg", "frequency": "Twice daily"}],
-                    "notes": "Diabetic â€” monitor healing carefully."},
+                    "notes": "Diabetic - monitor healing carefully."},
         "visits": [
             {"id": str(uuid.uuid4()), "date": "2025-11-19", "complaint": "Missing tooth replacement",
              "diagnosis": "Missing 36", "treatment": "Implant", "notes": "Implant placed. Healing 3 months.",
@@ -942,6 +955,7 @@ async def keep_alive_loop():
 @app.on_event("startup")
 async def startup():
     await seed()
+    await assert_collection_coverage(db)
     asyncio.create_task(keep_alive_loop())
 
 @app.on_event("shutdown")
